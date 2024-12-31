@@ -36,7 +36,7 @@ def get_max_msg_size(filename='config.txt'):
         with open(filename, 'r') as file:
             for line in file:
                 if line.startswith("max_msg_size:"):
-                    print(f"this is max_msg_size: {int(line.split(":", 1)[1].strip())}")
+                    #print(f"this is max_msg_size: {int(line.split(":", 1)[1].strip())}")
                     return int(line.split(":", 1)[1].strip())
         print("max_msg_size not found in configuration file.")
     except FileNotFoundError:

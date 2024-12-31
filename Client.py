@@ -96,16 +96,20 @@ def start_client():
     port = DEFAULT_SERVER_PORT
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-        client_socket.connect((host, port))
-        print("Connected to server.")
+        try:
+            client_socket.connect((host, port))
+            print("Connected to server.")
+        except ConnectionRefusedError:
+            print("Failed to connect to the server. Ensure the server is running.")
+            return
 
-        # קבלת כל הפרמטרים
+        # Get all parameters (message, window size, timeout)
         parameters = get_all_client_parameters()
         message = parameters["message"]
         window_size = parameters["window_size"]
         timeout = parameters["timeout"]
 
-        # שליחת בקשה לגודל הודעה מקסימלי
+        # Request maximum message size from the server
         request = "GET_MAX_MSG_SIZE"
         client_socket.send(request.encode('utf-8'))
         print("Requesting max message size from server...")
@@ -116,20 +120,24 @@ def start_client():
             print(f"Received max message size from server: {max_msg_size_from_server}")
         except (ValueError, ConnectionResetError, TimeoutError) as e:
             print(f"Failed to get max message size from server: {e}")
-            return  # סיום התוכנית אם לא התקבלה תשובה תקינה
+            return
 
-
-        # עדכון גודל ה-payload לפי השרת
+        # Calculate payload size
         payload_size = max_msg_size_from_server - HEADER_SIZE
         if payload_size <= 0:
             print("Error: HEADER_SIZE is larger than or equal to max_msg_size.")
             return
 
+        # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
+        print(f"Message split into {len(parts)} parts.")
+
         window_start = 0
+
         # Sliding window mechanism
         while window_start < len(parts):
             window_end = min(window_start + window_size, len(parts))
+            print(f"Current window: {window_start} to {window_end - 1}")
 
             # Send messages in the current window
             for i in range(window_start, window_end):
@@ -139,17 +147,21 @@ def start_client():
                 client_socket.send(full_message.encode('utf-8'))
 
             # Wait for acknowledgment
-            response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-            print(f"Received ACK: {response}")
-            ack_num = int(response.replace("ACK", "").strip())
+            try:
+                response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                ack_num = int(response.replace("ACK", "").strip())
+                print(f"Received ACK for message: {ack_num}")
 
-            # Slide the window forward
-            if ack_num >= window_start:
-                window_start = ack_num + 1
-            print(f"Current window: {window_start} to {window_end - 1}")
-            print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
-            print(f"Received ACK for message: {ack_num}")
+                # Slide the window forward
+                if ack_num >= window_start:
+                    window_start = ack_num + 1
+            except (ValueError, ConnectionResetError):
+                print("Error during acknowledgment processing. Retrying current window.")
+                continue
 
+        print(f"Current window: {window_start} to {window_end - 1}")
+        print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
+        print(f"Received ACK for message: {ack_num}")
         print("All messages sent and acknowledged.")
         print("Closing the connection.")
         client_socket.close()
