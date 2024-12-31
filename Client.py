@@ -75,7 +75,8 @@ def start_client():
         exit(1)
 
     max_msg_size = int(config.get('maximum_msg_size', 400))
-
+    api_buffersize = int(config.get('api_buffersize', 65536))
+    header_size = int(config.get('header_size', 10))
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((host, port))
