@@ -1,12 +1,11 @@
 import socket
+from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
-api_buffersize = 65536  # גודל הבופר להודעות
-max_msg_size = 400  # גודל הודעה כולל (payload + header)
-header_size = 10  # גודל ה-header הקבוע
+max_msg_size = 400
 
 def start_server():
-    host = '127.0.0.1'
-    port = 9999
+    host = DEFAULT_SERVER_HOST
+    port = DEFAULT_SERVER_PORT
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -24,7 +23,7 @@ def start_server():
             try:
                 while True:  # לולאה פנימית להודעות מאותו לקוח
                     # קריאת הודעה או בקשה מהלקוח
-                    message = client_socket.recv(api_buffersize).decode('utf-8')
+                    message = client_socket.recv(BUFFER_SIZE).decode('utf-8')
                     if not message:
                         print("Client disconnected.")
                         break  # יציאה מהלולאה אם הלקוח סגר את החיבור
@@ -39,8 +38,8 @@ def start_server():
                         continue  # המשך להאזנה להודעות נוספות
 
                     # טיפול בהודעות רגילות
-                    header = message[:header_size]
-                    payload = message[header_size:]
+                    header = message[:HEADER_SIZE]
+                    payload = message[HEADER_SIZE:]
                     sequence_number = int(header[:4].strip())
 
                     print(f"Received: Sequence Number: {sequence_number}, Payload: {payload}")
@@ -59,7 +58,7 @@ def start_server():
                         buffer[sequence_number] = payload
 
                     # שליחת ACK
-                    ack = f"ACK{last_acknowledged}".ljust(header_size)
+                    ack = f"ACK{last_acknowledged}".ljust(HEADER_SIZE)
                     client_socket.send(ack.encode('utf-8'))
                     print(f"Sent ACK: {last_acknowledged}")
 

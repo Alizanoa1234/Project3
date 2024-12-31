@@ -1,14 +1,12 @@
 import socket
+from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
-# הגדרות בסיסיות
-api_buffersize = 65536  # גודל הבופר להודעות
-header_size = 10  # גודל ה-header הקבוע
 
 def create_header(sequence_number, payload_size):
     """
     יוצר header הכולל מספר סידורי וגודל ה-payload.
     """
-    return f"{sequence_number:04}{payload_size:04}".ljust(header_size)
+    return f"{sequence_number:04}{payload_size:04}".ljust(HEADER_SIZE)
 
 def read_config_file(filename='config.txt'):
     """
@@ -65,17 +63,14 @@ def choose_message_source():
     return source
 
 def start_client():
-    host = '127.0.0.1'
-    port = 9999
+    host = DEFAULT_SERVER_HOST
+    port = DEFAULT_SERVER_PORT
 
     # קריאת פרמטרים מקובץ הקונפיגורציה
     config = read_config_file()
     if config is None:
         print("Failed to load configuration.")
         exit(1)
-
-    max_msg_size = int(config.get('maximum_msg_size', 400))
-
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((host, port))
@@ -96,11 +91,11 @@ def start_client():
         # שליחת בקשה לגודל הודעה מקסימלי
         request = "GET_MAX_MSG_SIZE"
         client_socket.send(request.encode('utf-8'))
-        max_msg_size = int(client_socket.recv(api_buffersize).decode('utf-8'))
+        max_msg_size = int(client_socket.recv(BUFFER_SIZE).decode('utf-8'))
         print(f"Received max message size from server: {max_msg_size}")
 
         # חישוב גודל ה-payload
-        payload_size = max_msg_size - header_size
+        payload_size = max_msg_size - HEADER_SIZE
         if payload_size <= 0:
             print("Error: HEADER_SIZE is larger than or equal to max_msg_size.")
             return
@@ -122,7 +117,7 @@ def start_client():
             client_socket.send(full_message.encode('utf-8'))
 
         # קבלת תשובה מהשרת
-        response = client_socket.recv(api_buffersize).decode('utf-8')
+        response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
         print(f"Received response from server: {response}")
 
 if __name__ == "__main__":
