@@ -2,12 +2,13 @@
 
 import socket
 
-API_BUFFERSIZE = 1024
-HEADER_SIZE = 10
+api_buffersize = 65536  # גודל הבופר להודעות
+max_msg_size = 400  # גודל הודעה כולל (payload + header)
+header_size = 10  # גודל ה-header הקבוע
 
 def create_header(sequence_number, payload_size):
 
-    return f"{sequence_number:04}{payload_size:04}".ljust(HEADER_SIZE)
+    return f"{sequence_number:04}{payload_size:04}".ljust(header_size)
 
 def get_message_to_send(source="user"):
     """
@@ -45,11 +46,11 @@ def start_client():
         # Send request for max message size
         request = "GET_MAX_MSG_SIZE"
         client_socket.send(request.encode('utf-8'))
-        max_msg_size = int(client_socket.recv(API_BUFFERSIZE).decode('utf-8'))
+        max_msg_size = int(client_socket.recv(api_buffersize).decode('utf-8'))
         print(f"Received max message size from server: {max_msg_size}")
 
         # Calculate payload size
-        payload_size = max_msg_size - HEADER_SIZE
+        payload_size = max_msg_size - header_size
         if payload_size <= 0:
             print("Error: HEADER_SIZE is larger than or equal to max_msg_size.")
             return
@@ -74,7 +75,7 @@ def start_client():
             client_socket.send(full_message.encode('utf-8'))
 
         # Receive response from server
-        response = client_socket.recv(API_BUFFERSIZE).decode('utf-8')
+        response = client_socket.recv(api_buffersize).decode('utf-8')
         print(f"Received response from server: {response}")
 
 if __name__ == "__main__":

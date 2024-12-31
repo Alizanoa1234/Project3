@@ -1,8 +1,8 @@
 import socket
 
-API_BUFFERSIZE = 65536  # גודל הבופר להודעות
-MAX_MSG_SIZE = 400  # גודל הודעה כולל (payload + header)
-HEADER_SIZE = 10  # גודל ה-header הקבוע
+api_buffersize = 65536  # גודל הבופר להודעות
+max_msg_size = 400  # גודל הודעה כולל (payload + header)
+header_size = 10  # גודל ה-header הקבוע
 
 def start_server():
     host = '127.0.0.1'
@@ -24,7 +24,7 @@ def start_server():
             try:
                 while True:  # לולאה פנימית להודעות מאותו לקוח
                     # קריאת הודעה או בקשה מהלקוח
-                    message = client_socket.recv(API_BUFFERSIZE).decode('utf-8')
+                    message = client_socket.recv(api_buffersize).decode('utf-8')
                     if not message:
                         print("Client disconnected.")
                         break  # יציאה מהלולאה אם הלקוח סגר את החיבור
@@ -33,14 +33,14 @@ def start_server():
 
                     if message == "GET_MAX_MSG_SIZE":
                         # שליחת גודל הודעה מקסימלי ללקוח
-                        response = str(MAX_MSG_SIZE)
+                        response = str(max_msg_size)
                         client_socket.send(response.encode('utf-8'))
                         print(f"Sent max message size: {response}")
                         continue  # המשך להאזנה להודעות נוספות
 
                     # טיפול בהודעות רגילות
-                    header = message[:HEADER_SIZE]
-                    payload = message[HEADER_SIZE:]
+                    header = message[:header_size]
+                    payload = message[header_size:]
                     sequence_number = int(header[:4].strip())
 
                     print(f"Received: Sequence Number: {sequence_number}, Payload: {payload}")
@@ -59,7 +59,7 @@ def start_server():
                         buffer[sequence_number] = payload
 
                     # שליחת ACK
-                    ack = f"ACK{last_acknowledged}".ljust(HEADER_SIZE)
+                    ack = f"ACK{last_acknowledged}".ljust(header_size)
                     client_socket.send(ack.encode('utf-8'))
                     print(f"Sent ACK: {last_acknowledged}")
 

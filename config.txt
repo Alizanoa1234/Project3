@@ -1,3 +1,6 @@
 maximum_msg_size:400
 window_size:4
 timeout:5
+api_buffersize:65536
+header_size = 10
+
