@@ -76,9 +76,9 @@
 import socket
 
 
-def server(host: str, port: int) -> None:
+def start_server():
     # הגדרת פרמטרים לשרת
-    host = '127.0.0.1'  # הכתובת המקומית
+    host = '0.0.0.0'
     port = 12345  # מספר פורט (ניתן לשנות)
 
     # יצירת אובייקט socket
@@ -104,6 +104,5 @@ def server(host: str, port: int) -> None:
             client_socket.close()
             print(f"Connection with {client_address} closed.")
 
-
-if __name__ == "_main_":
+if __name__ == "__main__":
     start_server()

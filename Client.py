@@ -85,7 +85,7 @@ import socket
 
 def start_client():
     # הגדרת פרמטרים ללקוח
-    host = '127.0.0.1'  # כתובת השרת
+    host = '0.0.0.0'
     port = 12345  # מספר פורט של השרת
 
     # יצירת אובייקט socket
@@ -102,5 +102,5 @@ def start_client():
         response = client_socket.recv(1024).decode('utf-8')
         print(f"Received response from server: {response}")
 
-if __name__ == "_main_":
+if __name__ == "__main__":
     start_client()
