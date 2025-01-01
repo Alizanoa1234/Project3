@@ -1,4 +1,5 @@
 import socket
+import time
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
 
@@ -91,7 +92,6 @@ def get_all_client_parameters():
         "timeout": timeout,
     }
 
-
 def start_client():
     host = DEFAULT_SERVER_HOST
     port = DEFAULT_SERVER_PORT
@@ -108,6 +108,7 @@ def start_client():
         parameters = get_all_client_parameters()
         message = parameters["message"]
         window_size = parameters["window_size"]
+        timeout = parameters["timeout"]  # Retrieve the timeout value
 
         # Request maximum message size from the server
         request = "GET_MAX_MSG_SIZE"
@@ -115,6 +116,7 @@ def start_client():
         print("Requesting max message size from server...")
 
         try:
+            # Receive the maximum message size from the server
             response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
             max_msg_size_from_server = int(response)
             print(f"Received max message size from server: {max_msg_size_from_server}")
@@ -122,19 +124,21 @@ def start_client():
             print(f"Failed to get max message size from server: {e}")
             return
 
-        # Calculate payload size
-        payload_size = max_msg_size_from_server
+        # Calculate payload size based on max message size
+        payload_size = max_msg_size_from_server - HEADER_SIZE
+        if payload_size <= 0:
+            print("Error: HEADER_SIZE is larger than or equal to max_msg_size.")
+            return
         print(f"Payload size set to: {payload_size}")
 
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
         print(f"Message split into {len(parts)} parts.")
 
-
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
 
-        # Sliding window mechanism
+        # Sliding window mechanism with timeout
         try:
             while unacknowledged:
                 window_end = min(window_start + window_size, len(parts))
@@ -148,25 +152,38 @@ def start_client():
                         print(f"[Sending] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
                         client_socket.send(full_message.encode('utf-8'))
 
-                # Wait for acknowledgment
-                try:
-                    response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                    ack_num = int(response.replace("ACK", "").strip())
-                    print(f"[ACK] Received ACK for message: {ack_num}")
+                # Start timer for timeout
+                timer_start = time.time()
 
-                    # Process cumulative ACKs
-                    for seq in range(window_start, ack_num + 1):
-                        if seq in unacknowledged:
-                            unacknowledged.remove(seq)
-                    window_start = ack_num + 1
-                except (ValueError, ConnectionResetError):
-                    print("[Error] Acknowledgment processing failed. Retrying unacknowledged parts.")
-                    continue
+                while time.time() - timer_start < timeout:
+                    try:
+                        # Wait for acknowledgment
+                        client_socket.settimeout(timeout - (time.time() - timer_start))
+                        response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                        ack_num = int(response.replace("ACK", "").strip())
+                        print(f"[ACK] Received ACK for message: {ack_num}")
+
+                        # Process cumulative ACKs
+                        for seq in range(window_start, ack_num + 1):
+                            if seq in unacknowledged:
+                                unacknowledged.remove(seq)
+                        window_start = ack_num + 1
+
+                        # Break the timeout loop when acknowledgment is received
+                        break
+                    except socket.timeout:
+                        print(f"[Timeout] No ACK received within {timeout} seconds. Retrying...")
+                        break  # Retry sending unacknowledged parts
+                    except (ValueError, ConnectionResetError):
+                        print("[Error] Acknowledgment processing failed. Retrying unacknowledged parts.")
+                        break
+
         finally:
             # Final cleanup and connection closure
             print("All messages sent and acknowledged.")
             print("Closing the connection.")
             client_socket.close()
+
 
 
 
