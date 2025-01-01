@@ -108,7 +108,6 @@ def start_client():
         parameters = get_all_client_parameters()
         message = parameters["message"]
         window_size = parameters["window_size"]
-        timeout = parameters["timeout"]
 
         # Request maximum message size from the server
         request = "GET_MAX_MSG_SIZE"
@@ -134,18 +133,20 @@ def start_client():
         print(f"Message split into {len(parts)} parts.")
 
         window_start = 0
+        unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
 
         # Sliding window mechanism
-        while window_start < len(parts):
+        while unacknowledged:
             window_end = min(window_start + window_size, len(parts))
             print(f"Current window: {window_start} to {window_end - 1}")
 
             # Send messages in the current window
             for i in range(window_start, window_end):
-                header = create_header(i, len(parts[i]))
-                full_message = header + parts[i]
-                print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
-                client_socket.send(full_message.encode('utf-8'))
+                if i in unacknowledged:
+                    header = create_header(i, len(parts[i]))
+                    full_message = header + parts[i]
+                    print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
+                    client_socket.send(full_message.encode('utf-8'))
 
             # Wait for acknowledgment
             try:
@@ -153,11 +154,13 @@ def start_client():
                 ack_num = int(response.replace("ACK", "").strip())
                 print(f"Received ACK for message: {ack_num}")
 
-                # Slide the window forward
+                # Remove acknowledged parts
+                if ack_num in unacknowledged:
+                    unacknowledged.remove(ack_num)
                 if ack_num >= window_start:
                     window_start = ack_num + 1
             except (ValueError, ConnectionResetError):
-                print("Error during acknowledgment processing. Retrying current window.")
+                print("Error during acknowledgment processing. Retrying unacknowledged parts.")
                 continue
 
         print(f"Current window: {window_start} to {window_end - 1}")
