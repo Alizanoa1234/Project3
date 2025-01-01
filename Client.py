@@ -118,12 +118,6 @@ def start_client():
             print("Failed to connect to the server. Ensure the server is running.")
             return
 
-        # Get all parameters (message, window size, timeout)
-        parameters = get_all_client_parameters()
-        message = parameters["message"]
-        window_size = parameters["window_size"]
-        timeout = parameters["timeout"]  # Retrieve the timeout value
-
         # Request maximum message size from the server
         request = "GET_MAX_MSG_SIZE"
         client_socket.send(request.encode('utf-8'))
@@ -137,6 +131,12 @@ def start_client():
         except (ValueError, ConnectionResetError, TimeoutError) as e:
             print(f"Failed to get max message size from server: {e}")
             return
+
+        # Get all parameters (message, window size, timeout)
+        parameters = get_all_client_parameters()
+        message = parameters["message"]
+        window_size = parameters["window_size"]
+        timeout = parameters["timeout"]  # Retrieve the timeout value
 
         # Calculate payload size
         payload_size = max_msg_size_from_server
