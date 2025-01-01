@@ -123,10 +123,8 @@ def start_client():
             return
 
         # Calculate payload size
-        payload_size = max_msg_size_from_server - HEADER_SIZE
-        if payload_size <= 0:
-            print("Error: HEADER_SIZE is larger than or equal to max_msg_size.")
-            return
+        payload_size = max_msg_size_from_server
+        print(f"Payload size set to: {payload_size}")
 
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
@@ -145,7 +143,8 @@ def start_client():
                 if i in unacknowledged:
                     header = create_header(i, len(parts[i]))
                     full_message = header + parts[i]
-                    print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
+                    total_size = len(full_message)
+                    print(f"Sending part {i + 1}/{len(parts)}: {full_message} (Size: {total_size} bytes)")
                     client_socket.send(full_message.encode('utf-8'))
 
             # Wait for acknowledgment
