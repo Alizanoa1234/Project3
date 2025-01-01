@@ -4,6 +4,7 @@ from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SI
 
 def create_header(sequence_number, payload_size):
     """
+
     יוצר header הכולל מספר סידורי וגודל ה-payload.
     """
     return f"{sequence_number:04}{payload_size:04}".ljust(HEADER_SIZE)
