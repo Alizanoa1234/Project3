@@ -88,29 +88,32 @@ def start_server():
                         continue  # המשך להאזנה להודעות נוספות
 
                     # טיפול בהודעות רגילות
-                    header = message[:HEADER_SIZE]
-                    sequence_number = int(header[:sequence_digits].strip())
-                    payload = message[HEADER_SIZE:]
+                        # טיפול בהודעות רגילות
+                        header = message[:HEADER_SIZE]
+                        payload = message[HEADER_SIZE:]
+                        sequence_number = int(header[:4].strip())
 
-                    print(f"Received: Sequence Number: {sequence_number}, Payload: {payload}")
+                        print(f"Received: Sequence Number: {sequence_number}, Payload: {payload}")
 
-                    # ניהול ACK ושמירה על הסדר
-                    if sequence_number == last_acknowledged + 1:
-                        print(f"Message {sequence_number} received in order.")
-                        last_acknowledged = sequence_number
+                        # ניהול ACK ושמירה על הסדר
+                        # Managing ACKs and maintaining order
+                        if sequence_number == last_acknowledged + 1:
+                            print(f"Message {sequence_number} received in order.")
+                            last_acknowledged = sequence_number
+
+                            while last_acknowledged + 1 in buffer:
+                                print(f"Message {last_acknowledged + 1} now in order.")
+                                last_acknowledged += 1
+                                del buffer[last_acknowledged]
+                        else:
+                            print(f"Message {sequence_number} received out of order. Storing in buffer.")
+                            buffer[sequence_number] = payload
+
+                        # Send ACK for the last byte received in order
                         ack = f"ACK{last_acknowledged}".ljust(HEADER_SIZE)
                         client_socket.send(ack.encode('utf-8'))
                         print(f"Sent ACK: {last_acknowledged}")
-                    else:
-                        print(f"Message {sequence_number} received out of order. Storing in buffer.")
-                        buffer[sequence_number] = payload
-                        ack = f"ACK{last_acknowledged}".ljust(HEADER_SIZE)  # שולח ACK עבור החבילה האחרונה שאושרה
-                        client_socket.send(ack.encode('utf-8'))
 
-                    # שליחת ACK
-                    ack = f"ACK{last_acknowledged}".ljust(HEADER_SIZE)
-                    client_socket.send(ack.encode('utf-8'))
-                    print(f"Sent ACK: {last_acknowledged}")
 
             except ConnectionResetError:
                 print("Connection was reset by the client.")
