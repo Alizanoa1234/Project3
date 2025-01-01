@@ -21,9 +21,12 @@ def get_server_parameters():
             print(f"max_msg_size successfully read from file: {max_msg_size}")
     else:
         max_msg_size = input("Enter the maximum message size (default: 400): ").strip()
-        max_msg_size = int(max_msg_size) if max_msg_size.isdigit() else 400
+        try:
+            max_msg_size = int(max_msg_size)  # ניסיון להמיר למספר שלם
+        except ValueError:
+            print("Invalid input. Using default max message size of 400.")
+            max_msg_size = 400
         print(f"max_msg_size set by user input: {max_msg_size}")
-
 
     print(f"Final max_msg_size: {max_msg_size}")
     return {"maximum_msg_size": max_msg_size}
