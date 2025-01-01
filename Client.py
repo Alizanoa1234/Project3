@@ -181,7 +181,8 @@ if __name__ == "__main__":
         #         print(f"Part {i + 1}/{len(parts)}: {len(part)} bytes, Content: {part}")
         #         client_socket.send(full_message.encode('utf-8'))
         # else:
-        #     header = create_header(0, len(message))
+        #     header =
+    #     create_header(0, len(message))
         #     full_message = header + message
         #     print(f"Sending message: {full_message}")
         #     client_socket.send(full_message.encode('utf-8'))
