@@ -158,7 +158,11 @@ def start_client():
 
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
-
+        # Precompute headers for all parts
+        headers = {
+            i: create_header(sequence_number=i, payload_size=len(parts[i]), sequence_digits=4, payload_digits=4)
+            for i in range(len(parts))
+        }
         # Sliding window mechanism with timeout
         try:
             while unacknowledged:
@@ -168,7 +172,7 @@ def start_client():
                 # Send messages in the current window
                 for i in range(window_start, window_end):
                     if i in unacknowledged:
-                        header = create_header(i, len(parts[i]))
+                        header = headers[i]  # Use precomputed header
                         full_message = header + parts[i]
                         print(f"[Sending] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
                         client_socket.send(full_message.encode('utf-8'))
@@ -194,7 +198,7 @@ def start_client():
                         # Retry sending only unacknowledged parts
                         for i in range(window_start, window_end):
                             if i in unacknowledged:
-                                header = create_header(i, len(parts[i]))
+                                header = headers[i]  # Use precomputed header
                                 full_message = header + parts[i]
                                 print(
                                     f"[Retrying] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
