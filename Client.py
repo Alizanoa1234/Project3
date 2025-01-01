@@ -130,44 +130,43 @@ def start_client():
         parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
         print(f"Message split into {len(parts)} parts.")
 
+
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
 
         # Sliding window mechanism
-        while unacknowledged:
-            window_end = min(window_start + window_size, len(parts))
-            print(f"Current window: {window_start} to {window_end - 1}")
+        try:
+            while unacknowledged:
+                window_end = min(window_start + window_size, len(parts))
+                print(f"Current window: {window_start} to {window_end - 1}")
 
-            # Send messages in the current window
-            for i in range(window_start, window_end):
-                if i in unacknowledged:
-                    header = create_header(i, len(parts[i]))
-                    full_message = header + parts[i]
-                    total_size = len(full_message)
-                    print(f"Sending part {i + 1}/{len(parts)}: {full_message} (Size: {total_size} bytes)")
-                    client_socket.send(full_message.encode('utf-8'))
+                # Send messages in the current window
+                for i in range(window_start, window_end):
+                    if i in unacknowledged:
+                        header = create_header(i, len(parts[i]))
+                        full_message = header + parts[i]
+                        print(f"[Sending] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
+                        client_socket.send(full_message.encode('utf-8'))
 
-            # Wait for acknowledgment
-            try:
-                response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                ack_num = int(response.replace("ACK", "").strip())
-                print(f"Received ACK for message: {ack_num}")
+                # Wait for acknowledgment
+                try:
+                    response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                    ack_num = int(response.replace("ACK", "").strip())
+                    print(f"[ACK] Received ACK for message: {ack_num}")
 
-                # Remove acknowledged parts
-                if ack_num in unacknowledged:
-                    unacknowledged.remove(ack_num)
-                if ack_num >= window_start:
+                    # Process cumulative ACKs
+                    for seq in range(window_start, ack_num + 1):
+                        if seq in unacknowledged:
+                            unacknowledged.remove(seq)
                     window_start = ack_num + 1
-            except (ValueError, ConnectionResetError):
-                print("Error during acknowledgment processing. Retrying unacknowledged parts.")
-                continue
-
-        print(f"Current window: {window_start} to {window_end - 1}")
-        print(f"Sending part {i + 1}/{len(parts)}: {full_message}")
-        print(f"Received ACK for message: {ack_num}")
-        print("All messages sent and acknowledged.")
-        print("Closing the connection.")
-        client_socket.close()
+                except (ValueError, ConnectionResetError):
+                    print("[Error] Acknowledgment processing failed. Retrying unacknowledged parts.")
+                    continue
+        finally:
+            # Final cleanup and connection closure
+            print("All messages sent and acknowledged.")
+            print("Closing the connection.")
+            client_socket.close()
 
 
 
