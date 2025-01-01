@@ -52,8 +52,6 @@ def get_max_msg_size(filename='config.txt'):
 def start_server():
     host = DEFAULT_SERVER_HOST
     port = DEFAULT_SERVER_PORT
-    # קבלת פרמטרים לשרת
-
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -64,39 +62,42 @@ def start_server():
         last_acknowledged = -1
         buffer = {}
 
-        while True:  # לולאה חיצונית להאזנה לחיבורים חדשים
+        while True:  # External loop to handle new connections
             client_socket, client_address = server_socket.accept()
             print(f"Connection established with {client_address}")
             server_parameters = get_server_parameters()
             max_msg_size = server_parameters["maximum_msg_size"]
 
             try:
-                while True:  # לולאה פנימית להודעות מאותו לקוח
-                    # קריאת הודעה או בקשה מהלקוח
-                    message = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                    if not message:
-                        print("Client disconnected.")
-                        break  # יציאה מהלולאה אם הלקוח סגר את החיבור
+                while True:  # Internal loop for handling messages from the same client
+                    try:
+                        # Read message or request from the client
+                        message = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                        if not message:
+                            print("Client disconnected.")
+                            break  # Exit loop if client closes the connection
 
-                    print(f"Received message: {message}")
+                        print(f"Received message: {message}")
 
-                    if message == "GET_MAX_MSG_SIZE":
-                        # שליחת גודל הודעה מקסימלי ללקוח
-                        response = str(max_msg_size)
-                        client_socket.send(response.encode('utf-8'))
-                        print(f"Sent max message size: {response}")
-                        continue  # המשך להאזנה להודעות נוספות
+                        if message == "GET_MAX_MSG_SIZE":
+                            # Send the maximum message size to the client
+                            response = str(max_msg_size)
+                            client_socket.send(response.encode('utf-8'))
+                            print(f"Sent max message size: {response}")
+                            continue  # Wait for additional messages
 
-                    # טיפול בהודעות רגילות
-                        # טיפול בהודעות רגילות
+                        # Handle regular messages
                         header = message[:HEADER_SIZE]
                         payload = message[HEADER_SIZE:]
-                        sequence_number = int(header[:4].strip())
+                        try:
+                            sequence_number = int(header[:4].strip())
+                        except ValueError:
+                            print("Error: Invalid header received. Skipping this message.")
+                            continue  # Skip invalid messages
 
                         print(f"Received: Sequence Number: {sequence_number}, Payload: {payload}")
 
-                        # ניהול ACK ושמירה על הסדר
-                        # Managing ACKs and maintaining order
+                        # Manage ACKs and maintain order
                         if sequence_number == last_acknowledged + 1:
                             print(f"Message {sequence_number} received in order.")
                             last_acknowledged = sequence_number
@@ -114,12 +115,17 @@ def start_server():
                         client_socket.send(ack.encode('utf-8'))
                         print(f"Sent ACK: {last_acknowledged}")
 
+                    except socket.timeout:
+                        print("Timeout occurred while waiting for client data.")
+                    except Exception as e:
+                        print(f"Unexpected error while processing client message: {e}")
 
             except ConnectionResetError:
                 print("Connection was reset by the client.")
             finally:
                 client_socket.close()
                 print(f"Connection with {client_address} closed.")
+
 
 
 if __name__ == "__main__":
