@@ -174,6 +174,7 @@ def start_client():
 
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
+
         # Precompute headers for all parts
         print("******start sending the message*******")
         headers = {
@@ -224,33 +225,15 @@ def start_client():
                 if not ack_received:
                     print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
         finally:
-            # Final cleanup and connection closure
-            print("All messages sent and acknowledged.")
+            if not unacknowledged:
+                print("All messages sent and acknowledged.")
+            else:
+                print("Not all messages were acknowledged.")
             print("Closing the connection.")
             client_socket.shutdown(socket.SHUT_WR)  # Graceful shutdown
             client_socket.close()
-            print(f"Connection closed gracefully.")
+            print("Connection closed gracefully.")
 
 
 if __name__ == "__main__":
     start_client()
-        # # שליחת הודעה לשרת (עם פיצול אם צריך)
-        # if len(message) > payload_size:
-        #     print("Message exceeds max payload size. Splitting into parts.")
-        #     parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
-        #     print(f"Total parts to send: {len(parts)}")  # הדפסת מספר החלקים
-        #     for i, part in enumerate(parts):
-        #         header = create_header(i, len(part))
-        #         full_message = header + part
-        #         print(f"Part {i + 1}/{len(parts)}: {len(part)} bytes, Content: {part}")
-        #         client_socket.send(full_message.encode('utf-8'))
-        # else:
-        #     header =
-    #     create_header(0, len(message))
-        #     full_message = header + message
-        #     print(f"Sending message: {full_message}")
-        #     client_socket.send(full_message.encode('utf-8'))
-        #
-        # # קבלת תשובה מהשרת
-        # response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-        # print(f"Received response from server: {response}")

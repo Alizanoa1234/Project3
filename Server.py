@@ -81,7 +81,7 @@ def start_server():
             client_socket, client_address = server_socket.accept()
             print(f"Connection established with {client_address}")
             # todo צריך לשים טטים אאוט לכל קריאה מהלקוח?
-            client_socket.settimeout(15)
+           # client_socket.settimeout(15)
             server_parameters = get_server_parameters()
             max_msg_size = server_parameters["maximum_msg_size"]
 
