@@ -4,25 +4,13 @@ import time
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 import math
 
-HEADER_SIZE = 4  # גודל קבוע של ההדר
-
-
-def create_header(sequence_number, sequence_digits):
+def create_header(sequence_number, header_size):
     """
     יוצר Header שמכיל רק את המספר הסידורי.
     """
-    sequence_number_str = f"{sequence_number:0{HEADER_SIZE}d}"  # מספר סידורי בגודל קבוע
-    #sequence_number_str = f"{sequence_number:0{sequence_digits}d}"  # מספר סידורי בגודל קבוע
+    sequence_number_str = f"{sequence_number:0{header_size}d}"  # מספר סידורי בגודל קבוע
     return sequence_number_str
 
-
-# def calculate_header_size(num_segments, max_msg_size_from_server):
-#     """
-#     מחשב את מספר הספרות הדרושות למספר הסידורי ולגודל ה-payload.
-#     """
-#     sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
-#     payload_digits = len(str(max_msg_size_from_server))  # ספרות ל-Payload
-#     return sequence_digits, payload_digits
 
 def read_config_file(filename='config.txt'):
     """
@@ -41,19 +29,6 @@ def read_config_file(filename='config.txt'):
     except Exception as e:
         print(f"Error reading configuration file: {e}")
     return {}
-
-# def send_header_size(client_socket):
-#     """
-#     שולח לשרת את גודל ה-Header.
-#     """
-#     try:
-#         client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
-#         print(f"Sent fixed header size: {HEADER_SIZE}")
-#         return True
-#     except (BrokenPipeError, ConnectionResetError) as e:
-#         print(f"Failed to send header size. Error: {e}")
-#         return False
-
 
 
 def get_all_client_parameters():
@@ -159,15 +134,8 @@ def start_client():
             return
 
         total_message_size = len(message)
-        num_segments = math.ceil(len(message) / max_msg_size_from_server)
-
-        sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
-
-        # חישוב גודל ה-Header
-        #header_size = sequence_digits
-        header_size = 4
-
-        print(f"Calculated header size: {header_size}")
+        num_segments = math.ceil(total_message_size / max_msg_size_from_server)
+        header_size = len(str(num_segments))  # ספרות למספר סידורי
 
         try:
 
@@ -184,8 +152,10 @@ def start_client():
                 if response == "GET_HEADER_SIZE":
                     print("[Client] Server requested header size.")
 
+
                     # חישוב ושליחת גודל Header
-                    header_size = 4  # לדוגמה
+                    #header_size = 4  # לדוגמה
+                    print(f"Calculated header size: {header_size}")
                     try:
                         client_socket.send(f"{header_size}\n".encode('utf-8'))
                         print(f"[Client] Sent header size: {header_size}")
@@ -249,7 +219,7 @@ def start_client():
         # Precompute headers for all parts
         print("******start sending the message*******")
         headers = {
-            i: create_header(sequence_number=i, sequence_digits=4)
+            i: create_header(sequence_number=i, header_size=header_size)
             for i in range(len(parts))
         }
         # Sliding window mechanism with timeout
