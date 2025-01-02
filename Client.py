@@ -1,8 +1,8 @@
 import socket
 import time
-import math
 
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
+import math
 
 HEADER_SIZE = 4  # גודל קבוע של ההדר
 
@@ -127,15 +127,16 @@ def start_client():
             return
 
         # Request maximum message size from the server
-        try:
-            request = "GET_MAX_MSG_SIZE"
-            client_socket.send(request.encode('utf-8'))
-            print("Requesting max message size from server...")
+        request = "GET_MAX_MSG_SIZE"
+        client_socket.send(request.encode('utf-8'))
+        print("Requesting max message size from server...")
 
+        try:
+            # Receive the maximum message size from the server
             response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-            max_msg_size_from_server = int(response.strip())
+            max_msg_size_from_server = int(response)
             print(f"Received max message size from server: {max_msg_size_from_server}")
-        except (ValueError, ConnectionResetError, socket.timeout) as e:
+        except (ValueError, ConnectionResetError, TimeoutError) as e:
             print(f"Failed to get max message size from server: {e}")
             return
 
@@ -155,7 +156,6 @@ def start_client():
         total_message_size = len(message)
         num_segments = math.ceil(len(message) / max_msg_size_from_server)
 
-
         sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
 
         # חישוב גודל ה-Header
@@ -171,6 +171,7 @@ def start_client():
         print(f"Message split into {len(parts)} parts.")
         print(f"num_segments: {num_segments}")
 
+
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
         # Precompute headers for all parts
@@ -179,6 +180,7 @@ def start_client():
             i: create_header(sequence_number=i, sequence_digits=4)
             for i in range(len(parts))
         }
+        # Sliding window mechanism with timeout
         try:
             while unacknowledged:
                 window_end = min(window_start + window_size, len(parts))
@@ -187,11 +189,12 @@ def start_client():
                 # Send messages in the current window
                 for i in range(window_start, window_end):
                     if i in unacknowledged:
-                        header = headers[i]
+                        header = headers[i]  # Use precomputed header
                         full_message = header + parts[i]
                         print(f"[Sending] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
                         client_socket.send(full_message.encode('utf-8'))
 
+                # Start timer for timeout
                 timer_start = time.time()
                 ack_received = False
 
@@ -220,17 +223,34 @@ def start_client():
 
                 if not ack_received:
                     print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
-
         finally:
+            # Final cleanup and connection closure
             print("All messages sent and acknowledged.")
             print("Closing the connection.")
             client_socket.shutdown(socket.SHUT_WR)  # Graceful shutdown
             client_socket.close()
-            print("Connection closed gracefully.")
-
+            print(f"Connection closed gracefully.")
 
 
 if __name__ == "__main__":
     start_client()
-
-
+        # # שליחת הודעה לשרת (עם פיצול אם צריך)
+        # if len(message) > payload_size:
+        #     print("Message exceeds max payload size. Splitting into parts.")
+        #     parts = [message[i:i + payload_size] for i in range(0, len(message), payload_size)]
+        #     print(f"Total parts to send: {len(parts)}")  # הדפסת מספר החלקים
+        #     for i, part in enumerate(parts):
+        #         header = create_header(i, len(part))
+        #         full_message = header + part
+        #         print(f"Part {i + 1}/{len(parts)}: {len(part)} bytes, Content: {part}")
+        #         client_socket.send(full_message.encode('utf-8'))
+        # else:
+        #     header =
+    #     create_header(0, len(message))
+        #     full_message = header + message
+        #     print(f"Sending message: {full_message}")
+        #     client_socket.send(full_message.encode('utf-8'))
+        #
+        # # קבלת תשובה מהשרת
+        # response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+        # print(f"Received response from server: {response}")
