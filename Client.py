@@ -3,26 +3,26 @@ import time
 
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 import math
-def create_header(sequence_number, payload_size, sequence_digits, payload_digits):
-    sequence_number_str = f"{sequence_number:0{sequence_digits}d}"  # מספר סידורי בגודל קבוע
-    payload_size_str = f"{payload_size:0{payload_digits}d}"  # גודל payload בגודל קבוע
-    return sequence_number_str + payload_size_str
+
+HEADER_SIZE = 4  # גודל קבוע של ההדר
 
 
-def calculate_header_size(num_segments, max_msg_size_from_server):
+def create_header(sequence_number, sequence_digits):
     """
-    מחשב את מספר הספרות הדרושות למספר הסידורי ולגודל ה-payload.
+    יוצר Header שמכיל רק את המספר הסידורי.
     """
-    sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
-    payload_digits = len(str(max_msg_size_from_server))  # ספרות ל-Payload
-    return sequence_digits, payload_digits
+    sequence_number_str = f"{sequence_number:0{HEADER_SIZE}d}"  # מספר סידורי בגודל קבוע
+    #sequence_number_str = f"{sequence_number:0{sequence_digits}d}"  # מספר סידורי בגודל קבוע
+    return sequence_number_str
 
-def calculate_payload_digits(max_msg_size):
-    """
-    מחשב כמה ספרות נדרשות לייצוג ה-payload בגודל max_msg_size.
-    """
-    return len(str(max_msg_size))
 
+# def calculate_header_size(num_segments, max_msg_size_from_server):
+#     """
+#     מחשב את מספר הספרות הדרושות למספר הסידורי ולגודל ה-payload.
+#     """
+#     sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
+#     payload_digits = len(str(max_msg_size_from_server))  # ספרות ל-Payload
+#     return sequence_digits, payload_digits
 
 def read_config_file(filename='config.txt'):
     """
@@ -41,6 +41,14 @@ def read_config_file(filename='config.txt'):
     except Exception as e:
         print(f"Error reading configuration file: {e}")
     return {}
+
+def send_header_size(client_socket):
+    """
+    שולח לשרת את גודל ה-Header.
+    """
+    client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
+    print(f"Sent fixed header size: {HEADER_SIZE}")
+
 
 
 def get_all_client_parameters():
@@ -147,20 +155,29 @@ def start_client():
 
         total_message_size = len(message)
         num_segments = math.ceil(len(message) / max_msg_size_from_server)
-        sequence_digits, payload_digits = calculate_header_size(num_segments, max_msg_size_from_server)
+
+        sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
+
+        # חישוב גודל ה-Header
+        header_size = sequence_digits
+        print(f"Calculated header size: {header_size}")
+
+        # שליחת גודל ה-Header לשרת
+        send_header_size(client_socket)
 
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
-
+        print(f"Totak messege size: {total_message_size}")
         print(f"Message split into {len(parts)} parts.")
-        payload_size_str = f"{payload_size:0{payload_digits}d}"  # מייצג את ה-payload בגודל המתאים
-        print(f"Payload size representation: {payload_size_str}")
+        print(f"num_segments: {num_segments}")
+
 
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
         # Precompute headers for all parts
+        print("******start sending the message*******")
         headers = {
-            i: create_header(sequence_number=i, payload_size=len(parts[i]), sequence_digits=4, payload_digits=4)
+            i: create_header(sequence_number=i, sequence_digits=4)
             for i in range(len(parts))
         }
         # Sliding window mechanism with timeout
@@ -213,6 +230,7 @@ def start_client():
             print("Closing the connection.")
             client_socket.shutdown(socket.SHUT_WR)  # Graceful shutdown
             client_socket.close()
+            print(f"Connection closed gracefully.")
 
 
 if __name__ == "__main__":
