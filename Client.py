@@ -42,17 +42,17 @@ def read_config_file(filename='config.txt'):
         print(f"Error reading configuration file: {e}")
     return {}
 
-def send_header_size(client_socket):
-    """
-    שולח לשרת את גודל ה-Header.
-    """
-    try:
-        client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
-        print(f"Sent fixed header size: {HEADER_SIZE}")
-        return True
-    except (BrokenPipeError, ConnectionResetError) as e:
-        print(f"Failed to send header size. Error: {e}")
-        return False
+# def send_header_size(client_socket):
+#     """
+#     שולח לשרת את גודל ה-Header.
+#     """
+#     try:
+#         client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
+#         print(f"Sent fixed header size: {HEADER_SIZE}")
+#         return True
+#     except (BrokenPipeError, ConnectionResetError) as e:
+#         print(f"Failed to send header size. Error: {e}")
+#         return False
 
 
 
@@ -110,7 +110,7 @@ def get_all_client_parameters():
     else:
         print("Invalid choice. Defaulting to file.")
         timeout = int(config.get('timeout', '5'))
-        print(f"Timeout loaded from file: {timeout}")
+        print(f"Timeout loaded from file: {timeout}/n")
 
     return {
         "message": message,
@@ -164,35 +164,78 @@ def start_client():
         sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
 
         # חישוב גודל ה-Header
-        header_size = sequence_digits
+        #header_size = sequence_digits
+        header_size = 4
+
         print(f"Calculated header size: {header_size}")
 
-        # שליחת גודל ה-Header לשרת
-        # ניסיון לשלוח את ה-Header
         try:
-            client_socket.send(f"{header_size}".encode('utf-8'))
-            print(f"Sent fixed header size: {header_size}")
-        except (BrokenPipeError, ConnectionResetError) as e:
-            print(f"Failed to send header size. Error: {e}")
-            print("Reconnecting...")
 
-            # סגירת החיבור והתחברות מחדש
-            try:
-                client_socket.close()
-            except Exception:
-                pass
+            # קבלת כל הנתונים מהשרת
+            response_data = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+            print(f"The server's message: {response_data}")
+            responses = response_data.split("\n")  # פיצול הודעות לפי '\n'
 
-            # קוד התחברות מחדש (לדוגמה)
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client_socket.connect((host, port))
-            print("Reconnected to the server.")
-            # לאחר התחברות מחדש אפשר לנסות שוב לשלוח את ההדר או להפסיק
-            try:
-                client_socket.send(f"{header_size}".encode('utf-8'))
-                print(f"Sent fixed header size after reconnecting: {header_size}")
-            except Exception as e:
-                print(f"Failed to send header size again. Exiting. Error: {e}")
-                exit(1)  # סיים את התוכנית במקרה של כישלון נוסף
+            # עיבוד ההודעות שהתקבלו
+            ack_received = False  # משתנה לבדיקת אישור קבלת גודל ההדר
+
+            for response in responses:
+                response = response.strip()
+                if response == "GET_HEADER_SIZE":
+                    print("[Client] Server requested header size.")
+
+                    # חישוב ושליחת גודל Header
+                    header_size = 4  # לדוגמה
+                    try:
+                        client_socket.send(f"{header_size}\n".encode('utf-8'))
+                        print(f"[Client] Sent header size: {header_size}")
+                    except Exception as e:
+                        print(f"[Error] Failed to send header size: {e}")
+                        print("[Error] Reconnecting to server...")
+                        try:
+                            client_socket.close()
+                        except Exception as e:
+                            print(f"[Warning] Failed to close socket: {e}")
+                        exit(1)
+
+                    # קבלת ACK מהשרת
+                    try:
+                        ack_response = client_socket.recv(BUFFER_SIZE).decode('utf-8').strip()
+                        if ack_response == "ACK_HEADER":
+                            print("[Client] Server acknowledged header size.")
+                            ack_received = True
+                        else:
+                            print(f"[Error] Unexpected response from server: {ack_response}")
+                            exit(1)
+                    except Exception as e:
+                        print(f"[Error] Failed to receive ACK: {e}")
+                        exit(1)
+                elif response:
+                    print(f"[Error] Unexpected message from server: {response}")
+                    exit(1)
+
+            if not ack_received:
+                print("[Error] ACK_HEADER not received. Reconnecting...")
+                try:
+                    client_socket.close()
+                except Exception as e:
+                    print(f"[Warning] Failed to close socket: {e}")
+
+                # התחברות מחדש
+                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    client_socket.connect((host, port))
+                    print("Reconnected to the server. Retrying header size transmission...")
+                    client_socket.send(f"{header_size}".encode('utf-8'))
+                    print(f"Sent fixed header size after reconnecting: {header_size}")
+                except Exception as e:
+                    print(f"[Critical] Failed to reconnect or send header size. Exiting. Error: {e}")
+                    exit(1)
+
+        except Exception as e:
+            print(f"Failed to send header size. Exiting. Error: {e}")
+            exit(1)  # סיום התוכנית במקרה של כשל
+
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
         print(f"Totak messege size: {total_message_size}")

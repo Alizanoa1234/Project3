@@ -2,17 +2,35 @@ import socket
 
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
-HEADER_SIZE = 4  # גודל קבוע של ההדר
-
-
 # max_msg_size = 400
 def receive_header_size(client_socket):
     """
-    מקבל את גודל ה-Header מהלקוח.
+    מבקש את גודל ההדר מהלקוח ומאשר את קבלתו.
     """
-    header_size_data = client_socket.recv(1).decode('utf-8')  # קורא את הנתון שנשלח
-    print(f"Received header size : {HEADER_SIZE}")
-    return HEADER_SIZE
+    try:
+        # שליחת בקשה לגודל ההדר
+        client_socket.send("GET_HEADER_SIZE\n".encode('utf-8'))
+        print("[Server] Sent GET_HEADER_SIZE request.")
+
+        # קבלת גודל ההדר מהלקוח
+        header_size_data = client_socket.recv(10).decode('utf-8').strip()
+        if not header_size_data.isdigit():
+            raise ValueError(f"Invalid header size received: {header_size_data}")
+
+        header_size = int(header_size_data)
+        print(f"[Server] Received header size: {header_size}")
+
+        # שליחת ACK על קבלת ההדר
+        client_socket.send("ACK_HEADER\n".encode('utf-8'))
+        print("[Server] Sent acknowledgment for header size.")
+
+        return header_size
+    except ValueError as e:
+        print(f"[Error] {e}")
+    except Exception as e:
+        print(f"[Error] An unexpected error occurred: {e}")
+        return None
+
 
 
 def get_server_parameters():
@@ -98,11 +116,16 @@ def start_server():
                     client_socket.send(response.encode('utf-8'))
                     print(f"Sent max message size: {response}")
 
-                # בקשת גודל ה-Header מהלקוח
-                request = "get_header_size"
-                client_socket.send(request.encode('utf-8'))
+
                 print("Requesting header size from client...")
                 header_size = receive_header_size(client_socket)
+                if header_size is None:
+                    print("Failed to receive header size. Closing connection.")
+                    client_socket.close()
+                    # אפשר לנסות להתחבר מחדש או לסיים את התהליך
+                else:
+                    print(f"Header size received successfully: {header_size}")
+                    # המשך התהליך
 
                 # קריאת הודעה מהלקוח
                 while True:  # Internal loop for handling messages from the same client
