@@ -46,8 +46,13 @@ def send_header_size(client_socket):
     """
     שולח לשרת את גודל ה-Header.
     """
-    client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
-    print(f"Sent fixed header size: {HEADER_SIZE}")
+    try:
+        client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
+        print(f"Sent fixed header size: {HEADER_SIZE}")
+        return True
+    except (BrokenPipeError, ConnectionResetError) as e:
+        print(f"Failed to send header size. Error: {e}")
+        return False
 
 
 
@@ -163,8 +168,31 @@ def start_client():
         print(f"Calculated header size: {header_size}")
 
         # שליחת גודל ה-Header לשרת
-        send_header_size(client_socket)
+        # ניסיון לשלוח את ה-Header
+        try:
+            client_socket.send(f"{header_size}".encode('utf-8'))
+            print(f"Sent fixed header size: {header_size}")
+        except (BrokenPipeError, ConnectionResetError) as e:
+            print(f"Failed to send header size. Error: {e}")
+            print("Reconnecting...")
 
+            # סגירת החיבור והתחברות מחדש
+            try:
+                client_socket.close()
+            except Exception:
+                pass
+
+            # קוד התחברות מחדש (לדוגמה)
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((host, port))
+            print("Reconnected to the server.")
+            # לאחר התחברות מחדש אפשר לנסות שוב לשלוח את ההדר או להפסיק
+            try:
+                client_socket.send(f"{header_size}".encode('utf-8'))
+                print(f"Sent fixed header size after reconnecting: {header_size}")
+            except Exception as e:
+                print(f"Failed to send header size again. Exiting. Error: {e}")
+                exit(1)  # סיים את התוכנית במקרה של כישלון נוסף
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
         print(f"Totak messege size: {total_message_size}")

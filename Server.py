@@ -11,7 +11,7 @@ def receive_header_size(client_socket):
     מקבל את גודל ה-Header מהלקוח.
     """
     header_size_data = client_socket.recv(1).decode('utf-8')  # קורא את הנתון שנשלח
-    print(f"Received header size (fixed to 4): {HEADER_SIZE}")
+    print(f"Received header size : {HEADER_SIZE}")
     return HEADER_SIZE
 
 
@@ -103,7 +103,6 @@ def start_server():
                 client_socket.send(request.encode('utf-8'))
                 print("Requesting header size from client...")
                 header_size = receive_header_size(client_socket)
-                print(f"Header size received: {header_size}")
 
                 # קריאת הודעה מהלקוח
                 while True:  # Internal loop for handling messages from the same client
