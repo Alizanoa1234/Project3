@@ -267,6 +267,7 @@ def start_client():
                 if not ack_received:
                     if window_start >= len(parts):
                         print("[Client] Final batch sent. No more messages to retry.")
+
                         break
                     else:
                         print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
