@@ -80,10 +80,11 @@ def get_max_msg_size(filename='config.txt'):
         print(f"Error reading configuration file: {e}")
     return None
 
-
 def start_server():
     host = DEFAULT_SERVER_HOST
     port = DEFAULT_SERVER_PORT
+    string_buffer = ""  # Temporary buffer to store message contents
+    unordered_buffer = {}  # Buffer to store out-of-order messages
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -92,12 +93,11 @@ def start_server():
         print(f"Server started on {host}:{port}. Waiting for connections...")
 
         last_acknowledged = -1
-        buffer = {}
 
         while True:  # External loop to handle new connections
-
             client_socket, client_address = server_socket.accept()
             print(f"Connection established with {client_address}")
+
             server_parameters = get_server_parameters()
             max_msg_size = server_parameters["maximum_msg_size"]
 
@@ -114,80 +114,95 @@ def start_server():
                     client_socket.send(response.encode('utf-8'))
                     print(f"Sent max message size: {response}")
 
-
                 print("Requesting header size from client...")
                 header_size = receive_header_size(client_socket)
                 if header_size is None:
                     print("Failed to receive header size. Closing connection.")
                     client_socket.close()
-                    # אפשר לנסות להתחבר מחדש או לסיים את התהליך
-                else:
-                    print(f"Header size received successfully: {header_size}")
-                    # המשך התהליך
+                    break  # Exit if header size not received
 
-                # קריאת הודעה מהלקוח
-                while True:  # Internal loop for handling messages from the same client
+                print(f"Header size received successfully: {header_size}")
+
+                # Read message from the client
+                while True:
                     try:
-                        part_count = 0  # To count the number of messages in the current batch
                         highest_sequence_in_batch = last_acknowledged  # Track the highest sequence in the current batch
+                        part_count = 0  # Track how many parts have been processed in this batch
+                        window_size = 4  # TODO: the window size can be adjusted by user input
+                        string_buffer = ""  # Temporary buffer to store message contents
+                        unordered_buffer = {}  # Buffer to store out-of-order messages
 
-                        while part_count < 4:  # Receive up to `window_size` messages in this batch
+                        while part_count < window_size:  # Receive up to `window_size` messages in this batch
                             try:
-                                client_socket.settimeout(5)  # Set a timeout to avoid hanging
-                                message = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                                if not message:
+                                client_socket.settimeout(20)  # Set a timeout to avoid hanging
+                                data = client_socket.recv(BUFFER_SIZE).decode('utf-8')  # Receive data
+
+                                if not data:
                                     print("Client disconnected or no more data to receive.")
                                     break  # Exit loop if the client sends no more data
 
-                                print(f"Received message: {message}")
+                                print(f"Received raw data: {data}")
+                                string_buffer += data  # Append received data to buffer
 
-                                # Extract header and payload
-                                header = message[:header_size]
-                                payload = message[header_size:header_size + max_msg_size]
-                                print(f"Parsed message -> Header: {header}, Payload: {payload}")
+                                # Process complete messages in the buffer
+                                while "\n" in string_buffer:
+                                    message, string_buffer = string_buffer.split("\n", 1)  # Split at the first newline
+                                    if message.strip():  # Ignore empty messages
+                                        print(f"Processing message: {message.strip()}")
 
-                                # Parse sequence number from the header
-                                try:
-                                    sequence_number = int(header.strip())
-                                    print(f"Sequence number extracted: {sequence_number}")
-                                except ValueError:
-                                    print("Error: Invalid header received. Skipping this message.")
-                                    continue  # Skip invalid messages
+                                        # Extract header and payload
+                                        header = message[:header_size]
+                                        payload = message[header_size:header_size + max_msg_size]
+                                        print(f"Parsed message -> Header: {header}, Payload: {payload}")
 
-                                # Handle in-order and out-of-order messages
-                                if sequence_number == last_acknowledged + 1:
-                                    print(f"Message {sequence_number} received in order.")
-                                    last_acknowledged = sequence_number  # Update the last acknowledged in-order message
-                                    highest_sequence_in_batch = max(highest_sequence_in_batch,
-                                                                    sequence_number)  # Track highest in batch
+                                        # Parse sequence number from the header
+                                        try:
+                                            sequence_number = int(header.strip())
+                                            print(f"Sequence number extracted: {sequence_number}")
+                                        except ValueError:
+                                            print("Error: Invalid header received. Skipping this message.")
+                                            continue  # Skip invalid messages
 
-                                    # Check if we can process buffered out-of-order messages
-                                    while last_acknowledged + 1 in buffer:
-                                        print(f"Message {last_acknowledged + 1} now in order.")
-                                        last_acknowledged += 1
-                                        del buffer[last_acknowledged]
-                                        highest_sequence_in_batch = max(highest_sequence_in_batch, last_acknowledged)
+                                        # Handle in-order and out-of-order messages
+                                        if sequence_number == last_acknowledged + 1:
+                                            print(f"Message {sequence_number} received in order.")
+                                            last_acknowledged = sequence_number  # Update the last acknowledged in-order message
+                                            highest_sequence_in_batch = max(highest_sequence_in_batch, sequence_number)
 
-                                else:
-                                    if sequence_number not in buffer:
-                                        print(f"Message {sequence_number} received out of order. Storing in buffer.")
-                                        buffer[sequence_number] = payload
-                                    else:
-                                        print(f"Duplicate message {sequence_number} received. Ignoring.")
+                                            # Check if we can process buffered out-of-order messages
+                                            while last_acknowledged + 1 in unordered_buffer:
+                                                print(f"Message {last_acknowledged + 1} now in order.")
+                                                last_acknowledged += 1
+                                                del unordered_buffer[last_acknowledged]
+                                                highest_sequence_in_batch = max(highest_sequence_in_batch,
+                                                                                last_acknowledged)
 
-                                part_count += 1  # Increment the count of messages in the batch
+                                        else:
+                                            if sequence_number not in unordered_buffer:
+                                                print(f"Message {sequence_number} received out of order. Storing in buffer.")
+                                                unordered_buffer[sequence_number] = payload
+                                            else:
+                                                print(f"Duplicate message {sequence_number} received. Ignoring.")
+
+                                        part_count += 1  # Increment the count of messages in the batch
 
                             except socket.timeout:
                                 print("Timeout occurred while waiting for client data.")
                                 break  # Exit batch processing on timeout
+
+                        # After processing all messages in the current batch
+                        print(f"Processed {part_count} message(s) in the current batch.")
+
+                        # Debugging: print all possible ACKs
+                        possible_acks = list(range(last_acknowledged + 1))
+                        print(f"Possible ACKs (up to current batch): {possible_acks}")
 
                         # After receiving the batch, send an ACK for the highest sequence number in this batch
                         ack = f"ACK{highest_sequence_in_batch}".ljust(header_size)
                         client_socket.send(ack.encode('utf-8'))
                         print(f"Sent cumulative ACK: {highest_sequence_in_batch}")
 
-                        # Inside the part handling loop:
-                        if part_count < 4 and len(buffer) == 0:
+                        if part_count < window_size and len(string_buffer) == 0:
                             print("No more parts expected. Exiting loop early.")
                             final_ack = "FINAL_ACK"
                             client_socket.send(final_ack.encode('utf-8'))  # Notify client explicitly
@@ -200,6 +215,7 @@ def start_server():
                     except Exception as e:
                         print(f"Unexpected error while processing client message: {e}")
                         break
+
             except ConnectionResetError:
                 print("Connection was reset by the client.")
             finally:

@@ -85,7 +85,7 @@ def get_all_client_parameters():
     else:
         print("Invalid choice. Defaulting to file.")
         timeout = int(config.get('timeout', '5'))
-        print(f"Timeout loaded from file: {timeout}/n")
+        print(f"Timeout loaded from file: {timeout}")
 
     return {
         "message": message,
@@ -138,7 +138,6 @@ def start_client():
         header_size = len(str(num_segments))  # ספרות למספר סידורי
 
         try:
-
             # קבלת כל הנתונים מהשרת
             response_data = client_socket.recv(BUFFER_SIZE).decode('utf-8')
             print(f"The server's message: {response_data}")
@@ -208,7 +207,7 @@ def start_client():
 
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
-        print(f"Totak messege size: {total_message_size}")
+        print(f"Total message size: {total_message_size}")
         print(f"Message split into {len(parts)} parts.")
         print(f"num_segments: {num_segments}")
 
@@ -228,13 +227,29 @@ def start_client():
                 window_end = min(window_start + window_size, len(parts))
                 print(f"Current window: {window_start} to {window_end - 1}")
 
-                # Send messages in the current window
+                # Build batch of messages for the current window
+                batch_messages = []
                 for i in range(window_start, window_end):
                     if i in unacknowledged:
                         header = headers[i]  # Use precomputed header
                         full_message = header + parts[i]
-                        print(f"[Sending] Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
-                        client_socket.send(full_message.encode('utf-8'))
+                        batch_messages.append(full_message)
+                        print(
+                            f"[Debug] Prepared message Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
+
+                if batch_messages:
+                    # Join messages into a batch with '\n'
+                    batch_data = "\n".join(batch_messages) + "\n"
+                    print(f"[Debug] Complete batch to send: {batch_data}")
+
+                    # Send the batch
+                    try:
+                        client_socket.send(batch_data.encode('utf-8'))
+                        print(f"[Client] Sent batch successfully: {batch_data}")
+                    except Exception as e:
+                        print(f"[Error] Failed to send batch: {e}")
+                        raise
+
 
                 # Start timer for timeout
                 timer_start = time.time()
