@@ -4,25 +4,13 @@ import time
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 import math
 
-HEADER_SIZE = 4  # גודל קבוע של ההדר
-
-
-def create_header(sequence_number, sequence_digits):
+def create_header(sequence_number, header_size):
     """
     יוצר Header שמכיל רק את המספר הסידורי.
     """
-    sequence_number_str = f"{sequence_number:0{HEADER_SIZE}d}"  # מספר סידורי בגודל קבוע
-    #sequence_number_str = f"{sequence_number:0{sequence_digits}d}"  # מספר סידורי בגודל קבוע
+    sequence_number_str = f"{sequence_number:0{header_size}d}"  # מספר סידורי בגודל קבוע
     return sequence_number_str
 
-
-# def calculate_header_size(num_segments, max_msg_size_from_server):
-#     """
-#     מחשב את מספר הספרות הדרושות למספר הסידורי ולגודל ה-payload.
-#     """
-#     sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
-#     payload_digits = len(str(max_msg_size_from_server))  # ספרות ל-Payload
-#     return sequence_digits, payload_digits
 
 def read_config_file(filename='config.txt'):
     """
@@ -41,14 +29,6 @@ def read_config_file(filename='config.txt'):
     except Exception as e:
         print(f"Error reading configuration file: {e}")
     return {}
-
-def send_header_size(client_socket):
-    """
-    שולח לשרת את גודל ה-Header.
-    """
-    client_socket.send(f"{HEADER_SIZE}".encode('utf-8'))
-    print(f"Sent fixed header size: {HEADER_SIZE}")
-
 
 
 def get_all_client_parameters():
@@ -105,7 +85,7 @@ def get_all_client_parameters():
     else:
         print("Invalid choice. Defaulting to file.")
         timeout = int(config.get('timeout', '5'))
-        print(f"Timeout loaded from file: {timeout}")
+        print(f"Timeout loaded from file: {timeout}/n")
 
     return {
         "message": message,
@@ -154,16 +134,77 @@ def start_client():
             return
 
         total_message_size = len(message)
-        num_segments = math.ceil(len(message) / max_msg_size_from_server)
+        num_segments = math.ceil(total_message_size / max_msg_size_from_server)
+        header_size = len(str(num_segments))  # ספרות למספר סידורי
 
-        sequence_digits = len(str(num_segments))  # ספרות למספר סידורי
+        try:
 
-        # חישוב גודל ה-Header
-        header_size = sequence_digits
-        print(f"Calculated header size: {header_size}")
+            # קבלת כל הנתונים מהשרת
+            response_data = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+            print(f"The server's message: {response_data}")
+            responses = response_data.split("\n")  # פיצול הודעות לפי '\n'
 
-        # שליחת גודל ה-Header לשרת
-        send_header_size(client_socket)
+            # עיבוד ההודעות שהתקבלו
+            ack_received = False  # משתנה לבדיקת אישור קבלת גודל ההדר
+
+            for response in responses:
+                response = response.strip()
+                if response == "GET_HEADER_SIZE":
+                    print("[Client] Server requested header size.")
+
+
+                    # חישוב ושליחת גודל Header
+                    #header_size = 4  # לדוגמה
+                    print(f"Calculated header size: {header_size}")
+                    try:
+                        client_socket.send(f"{header_size}\n".encode('utf-8'))
+                        print(f"[Client] Sent header size: {header_size}")
+                    except Exception as e:
+                        print(f"[Error] Failed to send header size: {e}")
+                        print("[Error] Reconnecting to server...")
+                        try:
+                            client_socket.close()
+                        except Exception as e:
+                            print(f"[Warning] Failed to close socket: {e}")
+                        exit(1)
+
+                    # קבלת ACK מהשרת
+                    try:
+                        ack_response = client_socket.recv(BUFFER_SIZE).decode('utf-8').strip()
+                        if ack_response == "ACK_HEADER":
+                            print("[Client] Server acknowledged header size.")
+                            ack_received = True
+                        else:
+                            print(f"[Error] Unexpected response from server: {ack_response}")
+                            exit(1)
+                    except Exception as e:
+                        print(f"[Error] Failed to receive ACK: {e}")
+                        exit(1)
+                elif response:
+                    print(f"[Error] Unexpected message from server: {response}")
+                    exit(1)
+
+            if not ack_received:
+                print("[Error] ACK_HEADER not received. Reconnecting...")
+                try:
+                    client_socket.close()
+                except Exception as e:
+                    print(f"[Warning] Failed to close socket: {e}")
+
+                # התחברות מחדש
+                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    client_socket.connect((host, port))
+                    print("Reconnected to the server. Retrying header size transmission...")
+                    client_socket.send(f"{header_size}".encode('utf-8'))
+                    print(f"Sent fixed header size after reconnecting: {header_size}")
+                except Exception as e:
+                    print(f"[Critical] Failed to reconnect or send header size. Exiting. Error: {e}")
+                    exit(1)
+
+        except Exception as e:
+            print(f"Failed to send header size. Exiting. Error: {e}")
+            exit(1)  # סיום התוכנית במקרה של כשל
 
         # Split the message into parts
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
@@ -178,7 +219,7 @@ def start_client():
         # Precompute headers for all parts
         print("******start sending the message*******")
         headers = {
-            i: create_header(sequence_number=i, sequence_digits=4)
+            i: create_header(sequence_number=i, header_size=header_size)
             for i in range(len(parts))
         }
         # Sliding window mechanism with timeout
@@ -210,7 +251,8 @@ def start_client():
 
                             # Process cumulative ACKs
                             for seq in range(window_start, ack_num + 1):
-                                unacknowledged.discard(seq)
+                                if seq in unacknowledged:
+                                    unacknowledged.discard(seq)
                             window_start = ack_num + 1
                             break  # Exit timeout loop on successful ACK
                         else:
@@ -223,7 +265,12 @@ def start_client():
                         break
 
                 if not ack_received:
-                    print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
+                    if window_start >= len(parts):
+                        print("[Client] Final batch sent. No more messages to retry.")
+                        break
+                    else:
+                        print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
+
         finally:
             if not unacknowledged:
                 print("All messages sent and acknowledged.")
