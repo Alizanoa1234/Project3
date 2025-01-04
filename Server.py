@@ -3,28 +3,45 @@ import socket
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
 # max_msg_size = 400
-def receive_header_size(client_socket):
+def receive_header_size_and_num_segment(client_socket):
     """
     מבקש את גודל ההדר מהלקוח ומאשר את קבלתו.
     """
     try:
         # שליחת בקשה לגודל ההדר
-        client_socket.send("GET_HEADER_SIZE\n".encode('utf-8'))
-        print("[Server] Sent GET_HEADER_SIZE request.")
+        client_socket.send("GET_HEADER_SIZE_AND_NUM_SEGMENTS\n".encode('utf-8'))
+        print("[Server] Sent GET_HEADER_SIZE_AND_NUM_SEGMENTS request.")
 
         # קבלת גודל ההדר מהלקוח
-        header_size_data = client_socket.recv(10).decode('utf-8').strip()
-        if not header_size_data.isdigit():
-            raise ValueError(f"Invalid header size received: {header_size_data}")
+        header_and_segments_data = client_socket.recv(10).decode('utf-8').strip()
 
-        header_size = int(header_size_data)
-        print(f"[Server] Received header size: {header_size}")
+        # if not header_and_segments_data.isdigit():
+        #     raise ValueError(f"Invalid header size or num of segments received: {header_and_segments_data}")
 
-        # שליחת ACK על קבלת ההדר
-        client_socket.send("ACK_HEADER\n".encode('utf-8'))
-        print("[Server] Sent acknowledgment for header size.")
+        if "," not in header_and_segments_data:
+            print("[Error] Data format is incorrect. Missing ',' between header size and number of segments.")
+            client_socket.send("ERROR_INVALID_FORMAT\n".encode('utf-8'))
+            return None, None
 
-        return header_size
+        header_size, num_segments = header_and_segments_data.split(",")
+
+        # המרת הנתונים למספרים והבקרה על תקינותם
+        try:
+            header_size = int(header_size)
+            num_segments = int(num_segments)
+        except ValueError:
+            print("[Error] One of the values is not a valid integer.")
+            client_socket.send("ERROR_INVALID_VALUES\n".encode('utf-8'))
+            return None, None
+
+        print(f"[Server] Received header size: {header_size} and num segments: {num_segments}")
+
+        # שליחת ACK על קבלת המידע
+        client_socket.send("ACK_HEADER_AND_SEGMENTS\n".encode('utf-8'))
+        print("[Server] Sent acknowledgment for header size and number of segments.")
+
+        return header_size, num_segments
+
     except ValueError as e:
         print(f"[Error] {e}")
     except Exception as e:
@@ -93,6 +110,7 @@ def start_server():
         print(f"Server started on {host}:{port}. Waiting for connections...")
 
         last_acknowledged = -1
+        last_message_received = None  # To keep track of the last message number
 
         while True:  # External loop to handle new connections
             client_socket, client_address = server_socket.accept()
@@ -114,14 +132,14 @@ def start_server():
                     client_socket.send(response.encode('utf-8'))
                     print(f"Sent max message size: {response}")
 
-                print("Requesting header size from client...")
-                header_size = receive_header_size(client_socket)
+                print("Requesting header size and num segments from client...")
+                header_size, num_segments = receive_header_size_and_num_segment(client_socket)
                 if header_size is None:
-                    print("Failed to receive header size. Closing connection.")
+                    print("Failed to receive header size and num segments. Closing connection.")
                     client_socket.close()
                     break  # Exit if header size not received
 
-                print(f"Header size received successfully: {header_size}")
+                print(f"Header size received successfully: {header_size} and num segments : {num_segments}")
 
                 # Read message from the client
                 while True:
@@ -166,6 +184,7 @@ def start_server():
                                         # Handle in-order and out-of-order messages
                                         if sequence_number == last_acknowledged + 1:
                                             print(f"Message {sequence_number} received in order.")
+                                            #fixme פה החבילה האחרונה נעצרת
                                             last_acknowledged = sequence_number  # Update the last acknowledged in-order message
                                             highest_sequence_in_batch = max(highest_sequence_in_batch, sequence_number)
 
@@ -177,6 +196,7 @@ def start_server():
                                                 highest_sequence_in_batch = max(highest_sequence_in_batch,
                                                                                 last_acknowledged)
 
+                    #fixme פה היה הבדיקה האחרונה
                                         else:
                                             if sequence_number not in unordered_buffer:
                                                 print(f"Message {sequence_number} received out of order. Storing in buffer.")
@@ -201,6 +221,14 @@ def start_server():
                         ack = f"ACK{highest_sequence_in_batch}".ljust(header_size)
                         client_socket.send(ack.encode('utf-8'))
                         print(f"Sent cumulative ACK: {highest_sequence_in_batch}")
+
+                        # Check if this is the last message
+                        if last_acknowledged == num_segments - 1:  # אם קיבלנו את ההודעה האחרונה
+                            print("Last message received. Sending FINAL_ACK.")
+                            final_ack = "FINAL_ACK"
+                            client_socket.send(final_ack.encode('utf-8'))  # Send FINAL_ACK
+                            print("[Server] Sent FINAL_ACK. Closing connection.")
+                            break  # Exit the loop after sending the final acknowledgment
 
                         if part_count < window_size and len(string_buffer) == 0:
                             print("No more parts expected. Exiting loop early.")

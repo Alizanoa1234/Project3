@@ -148,18 +148,19 @@ def start_client():
 
             for response in responses:
                 response = response.strip()
-                if response == "GET_HEADER_SIZE":
-                    print("[Client] Server requested header size.")
-
+                if response == "GET_HEADER_SIZE_AND_NUM_SEGMENTS":
+                    print("[Client] Server requested header size and number of segments.")
 
                     # חישוב ושליחת גודל Header
                     #header_size = 4  # לדוגמה
-                    print(f"Calculated header size: {header_size}")
+                    print(f"Calculated : header size: {header_size} +  num segments: {num_segments}")
+
                     try:
-                        client_socket.send(f"{header_size}\n".encode('utf-8'))
-                        print(f"[Client] Sent header size: {header_size}")
+                        data_to_send = f"{header_size},{num_segments}\n"  # שולחים את המידע מופרד בפסיק
+                        client_socket.send(data_to_send.encode('utf-8'))
+                        print(f"[Client] Sent header size : {header_size} and num segments :{num_segments}")
                     except Exception as e:
-                        print(f"[Error] Failed to send header size: {e}")
+                        print(f"[Error] Failed to send header size and num segments: {e}")
                         print("[Error] Reconnecting to server...")
                         try:
                             client_socket.close()
@@ -170,8 +171,8 @@ def start_client():
                     # קבלת ACK מהשרת
                     try:
                         ack_response = client_socket.recv(BUFFER_SIZE).decode('utf-8').strip()
-                        if ack_response == "ACK_HEADER":
-                            print("[Client] Server acknowledged header size.")
+                        if ack_response == "ACK_HEADER_AND_SEGMENTS":
+                            print("[Client] Server acknowledged header size and num of segment.")
                             ack_received = True
                         else:
                             print(f"[Error] Unexpected response from server: {ack_response}")
@@ -184,7 +185,7 @@ def start_client():
                     exit(1)
 
             if not ack_received:
-                print("[Error] ACK_HEADER not received. Reconnecting...")
+                print("[Error] ACK_HEADER_AND_SEGMENTS not received. Reconnecting...")
                 try:
                     client_socket.close()
                 except Exception as e:
@@ -194,15 +195,15 @@ def start_client():
                 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     client_socket.connect((host, port))
-                    print("Reconnected to the server. Retrying header size transmission...")
+                    print("Reconnected to the server. Retrying header size and num of segment transmission...")
                     client_socket.send(f"{header_size}".encode('utf-8'))
-                    print(f"Sent fixed header size after reconnecting: {header_size}")
+                    print(f"Sent fixed header size after reconnecting: {header_size} and num of segment: {num_segments}")
                 except Exception as e:
-                    print(f"[Critical] Failed to reconnect or send header size. Exiting. Error: {e}")
+                    print(f"[Critical] Failed to reconnect or send header size and num of segment. Exiting. Error: {e}")
                     exit(1)
 
         except Exception as e:
-            print(f"Failed to send header size. Exiting. Error: {e}")
+            print(f"Failed to send header size and num of segment. Exiting. Error: {e}")
             exit(1)  # סיום התוכנית במקרה של כשל
 
         # Split the message into parts
@@ -270,8 +271,14 @@ def start_client():
                                     unacknowledged.discard(seq)
                             window_start = ack_num + 1
                             break  # Exit timeout loop on successful ACK
+
+                        elif response == "FINAL_ACK":
+                            print("[Client] Received FINAL_ACK from server. Closing connection.")
+                            break  # Exit the loop when the server sends the final ACK
+
                         else:
                             print(f"[Error] Unexpected response from server: {response}")
+
                     except socket.timeout:
                         print(f"[Timeout] No ACK received within {timeout} seconds.")
                         break
