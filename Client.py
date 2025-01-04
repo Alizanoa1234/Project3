@@ -215,6 +215,7 @@ def start_client():
 
         window_start = 0
         unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
+        last_acknowledged = -1  # Start with -1 because no parts have been acknowledged yet
 
         # Precompute headers for all parts
         print("******start sending the message*******")
@@ -222,28 +223,27 @@ def start_client():
             i: create_header(sequence_number=i, header_size=header_size)
             for i in range(len(parts))
         }
+
         # Sliding window mechanism with timeout
         try:
+            # הלקוח שולח את ההודעות לפי גודל החלון ואז מחכה ל-ACK עבור כל ה-BATCH.
             while unacknowledged:
                 window_end = min(window_start + window_size, len(parts))
                 print(f"Current window: {window_start} to {window_end - 1}")
 
-                # Build batch of messages for the current window
+                # הכנת ה-BATCH של ההודעות לשליחה
                 batch_messages = []
                 for i in range(window_start, window_end):
                     if i in unacknowledged:
-                        header = headers[i]  # Use precomputed header
-                        full_message = header + parts[i]
+                        header = headers[i]
+                        full_message = header + parts[i] + "\n"
                         batch_messages.append(full_message)
                         print(
-                            f"[Debug] Prepared message Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
+                            f"[Debug] Prepared message Part {i}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
 
                 if batch_messages:
-                    # Join messages into a batch with '\n'
-                    batch_data = "\n".join(batch_messages) + "\n"
-                    print(f"[Debug] Complete batch to send: {batch_data}")
-
-                    # Send the batch
+                    # שולחים את כל ה-BATCH (כל ההודעות שבחלון) באותו הזמן
+                    batch_data = "".join(batch_messages)  # לא צריך '\n' בסוף כי כבר מוסיפים אותו בהודעות
                     try:
                         client_socket.send(batch_data.encode('utf-8'))
                         print(f"[Client] Sent batch successfully: {batch_data}")
@@ -251,30 +251,51 @@ def start_client():
                         print(f"[Error] Failed to send batch: {e}")
                         raise
 
-
-                # Start timer for timeout
+                # התחל טיימר לחכות ל-ACK
                 timer_start = time.time()
                 ack_received = False
+                final_ack_received = False  # Flag to check if FINAL_ACK is received
 
+                # המתנה ל-ACK עבור כל ההודעות שב-BATCH
                 while time.time() - timer_start < timeout:
                     try:
                         client_socket.settimeout(timeout - (time.time() - timer_start))
                         response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                        print(f"this is the response: {response}")
+
+                        # # הגדרת timeout לשימוש בתוך הלולאה
+                        # if response == "FINAL_ACK":
+                        #     print("[Client] Received FINAL_ACK from server. Closing connection.")
+                        #     final_ack_received = True
+                        #     break  # Exit the loop when the server sends the final ACK
+
                         if response.startswith("ACK"):
                             ack_num = int(response.replace("ACK", "").strip())
                             print(f"[ACK] Received ACK for message: {ack_num}")
                             ack_received = True
 
-                            # Process cumulative ACKs
+                            # בדוק אם זה ה-ACK עבור ההודעה האחרונה
+                            if ack_num == num_segments - 1:
+                                print("[Client] Last ACK received. Waiting for FINAL_ACK from server.")
+
+                                # המתן לקבלת FINAL_ACK
+                                while True:
+                                    #todo timeoot
+                                    response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
+                                    if response == "FINAL_ACK":
+                                        print("[Client] Received FINAL_ACK from server. Closing connection.")
+                                        final_ack_received = True
+                                        break  # Exit the loop when the server sends the final ACK
+                                    else:
+                                        print(f"[Error] Unexpected response: {response}. Retrying...")
+
+
+                            # עיבוד ACK עבור כל המסרים
                             for seq in range(window_start, ack_num + 1):
                                 if seq in unacknowledged:
                                     unacknowledged.discard(seq)
                             window_start = ack_num + 1
                             break  # Exit timeout loop on successful ACK
-
-                        elif response == "FINAL_ACK":
-                            print("[Client] Received FINAL_ACK from server. Closing connection.")
-                            break  # Exit the loop when the server sends the final ACK
 
                         else:
                             print(f"[Error] Unexpected response from server: {response}")
@@ -286,23 +307,58 @@ def start_client():
                         print(f"[Error] Acknowledgment processing failed: {e}. Retrying unacknowledged parts.")
                         break
 
+
+                    else:
+                        print("[Error] Did not receive final ACK. Closing connection.")
+
+                    client_socket.close()
+                    print("Connection closed.")
+
+
+
+                else:
+                    print("[Error] Did not receive final ACK. Closing connection.")
+
                 if not ack_received:
                     if window_start >= len(parts):
                         print("[Client] Final batch sent. No more messages to retry.")
-
                         break
                     else:
                         print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
+
+                        # שליחת ההודעות מחדש עבור החלקים שלא אושרו
+                        batch_messages = []
+                        for i in range(window_start, window_end):
+                            if i in unacknowledged:
+                                header = headers[i]  # Use precomputed header
+                                full_message = header + parts[i]
+                                batch_messages.append(full_message)
+                                print(
+                                    f"[Debug] Prepared message Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
+
+                        if batch_messages:
+                            # Join messages into a batch with '\n'
+                            batch_data = "".join(batch_messages) + "\n"
+                            print(f"[Debug] Complete batch to send: {batch_data}")
+
+                            try:
+                                client_socket.send(batch_data.encode('utf-8'))
+                                print(f"[Client] Sent batch successfully: {batch_data}")
+                            except Exception as e:
+                                print(f"[Error] Failed to send batch: {e}")
+                                raise
 
         finally:
             if not unacknowledged:
                 print("All messages sent and acknowledged.")
             else:
                 print("Not all messages were acknowledged.")
+
             print("Closing the connection.")
             client_socket.shutdown(socket.SHUT_WR)  # Graceful shutdown
             client_socket.close()
             print("Connection closed gracefully.")
+
 
 
 if __name__ == "__main__":

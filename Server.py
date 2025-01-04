@@ -1,4 +1,5 @@
 import socket
+import time
 
 from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
@@ -225,6 +226,7 @@ def start_server():
                         # Check if this is the last message
                         if last_acknowledged == num_segments - 1:  # אם קיבלנו את ההודעה האחרונה
                             print("Last message received. Sending FINAL_ACK.")
+                            time.sleep(1)  # זמן המתנה קטן לפני שליחת ה-FINAL_ACK
                             final_ack = "FINAL_ACK"
                             client_socket.send(final_ack.encode('utf-8'))  # Send FINAL_ACK
                             print("[Server] Sent FINAL_ACK. Closing connection.")
