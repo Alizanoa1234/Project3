@@ -88,7 +88,6 @@ def get_max_msg_size(filename='config.txt'):
     return None
 
 
-
 # Main server loop
 def start_server():
     host = DEFAULT_SERVER_HOST

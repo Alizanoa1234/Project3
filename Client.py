@@ -127,7 +127,7 @@ def start_client():
 
         # Calculate payload size and other message details
         payload_size = max_msg_size_from_server
-        print(f"Payload size set to: {payload_size}")
+        print(f"Payload size `set` to: {payload_size}")
         if payload_size <= 0:
             print("Error: HEADER_SIZE is larger than or equal to MAX_MSG_SIZE. Aborting.")
             return
@@ -232,7 +232,8 @@ def start_client():
 
                     except socket.timeout:
                         print(f"[Timeout] No ACK received.")
-                        break
+                        client_socket.send(batch_data.encode('utf-8'))  # Resend the batch after timeout
+
 
         finally:
             if not unacknowledged:
