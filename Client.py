@@ -1,20 +1,20 @@
 import socket
 import time
-
-from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 import math
+from api import BUFFER_SIZE, DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, HEADER_SIZE
 
+# Function to create a sequence number header for each message part
 def create_header(sequence_number, header_size):
     """
-    יוצר Header שמכיל רק את המספר הסידורי.
+    Creates a header containing the sequence number.
     """
-    sequence_number_str = f"{sequence_number:0{header_size}d}"  # מספר סידורי בגודל קבוע
+    sequence_number_str = f"{sequence_number:0{header_size}d}"  # Fixed-size sequence number
     return sequence_number_str
 
-
+# Reads parameters from a configuration file
 def read_config_file(filename='config.txt'):
     """
-    קורא את הפרמטרים מקובץ קונפיגורציה.
+    Reads configuration parameters from a file.
     """
     config = {}
     try:
@@ -30,15 +30,14 @@ def read_config_file(filename='config.txt'):
         print(f"Error reading configuration file: {e}")
     return {}
 
-
+# Retrieves user-defined or default client parameters
 def get_all_client_parameters():
     """
-    מאפשר למשתמש לבחור את מקור הפרמטרים (קובץ או קלט ידני) ומחזיר את הפרמטרים.
+    Allows the user to choose whether to provide input or load parameters from a file.
     """
-    # קריאת הפרמטרים מהקובץ
-    config = read_config_file('config.txt')
+    config = read_config_file('config.txt')  # Load from configuration file
 
-    # הודעה
+    # Message
     source = input("Do you want to provide the message from file or input (file/input)? ").strip().lower()
     if source == "file":
         message = config.get('message', 'This is a test message')
@@ -53,7 +52,7 @@ def get_all_client_parameters():
         message = config.get('message', 'This is a test message')
         print(f"Message loaded from file: {message}")
 
-    # גודל חלון
+    # Window size
     source = input("Do you want to provide the window size from file or input (file/input)? ").strip().lower()
     if source == "file":
         window_size = int(config.get('window_size', '4'))
@@ -61,7 +60,7 @@ def get_all_client_parameters():
     elif source == "input":
         window_size = input("Enter the window size: ").strip()
         try:
-            window_size = int(window_size)  # ניסיון להמיר למספר שלם
+            window_size = int(window_size)
         except ValueError:
             print("Invalid input. Using default window size of 4.")
             window_size = 4
@@ -78,7 +77,7 @@ def get_all_client_parameters():
     elif source == "input":
         timeout = input("Enter the timeout (in seconds): ").strip()
         try:
-            timeout = int(timeout)  # המרה למספר שלם
+            timeout = int(timeout)
         except ValueError:
             print("Invalid input. Using default timeout of 5 seconds.")
             timeout = 5
@@ -93,7 +92,7 @@ def get_all_client_parameters():
         "timeout": timeout,
     }
 
-
+# Main client function to establish connection and send data
 def start_client():
     host = DEFAULT_SERVER_HOST
     port = DEFAULT_SERVER_PORT
@@ -120,13 +119,13 @@ def start_client():
             print(f"Failed to get max message size from server: {e}")
             return
 
-        # Get all parameters (message, window size, timeout)
+        # Get client parameters (message, window size, timeout)
         parameters = get_all_client_parameters()
         message = parameters["message"]
         window_size = parameters["window_size"]
-        timeout = parameters["timeout"]  # Retrieve the timeout value
+        timeout = parameters["timeout"]
 
-        # Calculate payload size
+        # Calculate payload size and other message details
         payload_size = max_msg_size_from_server
         print(f"Payload size set to: {payload_size}")
         if payload_size <= 0:
@@ -135,40 +134,33 @@ def start_client():
 
         total_message_size = len(message)
         num_segments = math.ceil(total_message_size / max_msg_size_from_server)
-        header_size = len(str(num_segments))  # ספרות למספר סידורי
+        header_size = len(str(num_segments))
 
         try:
-            # קבלת כל הנתונים מהשרת
             response_data = client_socket.recv(BUFFER_SIZE).decode('utf-8')
             print(f"The server's message: {response_data}")
-            responses = response_data.split("\n")  # פיצול הודעות לפי '\n'
+            responses = response_data.split("\n")
 
-            # עיבוד ההודעות שהתקבלו
-            ack_received = False  # משתנה לבדיקת אישור קבלת גודל ההדר
-
+            ack_received = False
             for response in responses:
                 response = response.strip()
                 if response == "GET_HEADER_SIZE_AND_NUM_SEGMENTS":
                     print("[Client] Server requested header size and number of segments.")
-
-                    # חישוב ושליחת גודל Header
-                    #header_size = 4  # לדוגמה
-                    print(f"Calculated : header size: {header_size} +  num segments: {num_segments}")
+                    print(f"Calculated : header size: {header_size} + num segments: {num_segments}")
 
                     try:
-                        data_to_send = f"{header_size},{num_segments}\n"  # שולחים את המידע מופרד בפסיק
+                        data_to_send = f"{header_size},{num_segments}\n"
                         client_socket.send(data_to_send.encode('utf-8'))
-                        print(f"[Client] Sent header size : {header_size} and num segments :{num_segments}")
-                    except Exception as e:
-                        print(f"[Error] Failed to send header size and num segments: {e}")
-                        print("[Error] Reconnecting to server...")
-                        try:
-                            client_socket.close()
-                        except Exception as e:
-                            print(f"[Warning] Failed to close socket: {e}")
-                        exit(1)
+                        print(f"[Client] Sent header size: {header_size} and num segments: {num_segments}")
 
-                    # קבלת ACK מהשרת
+                        # Send window size separately
+                        client_socket.send(f"{window_size}\n".encode('utf-8'))
+                        print(f"[Client] Sent window size: {window_size}")
+
+                    except Exception as e:
+                        print(f"[Error] Failed to send header size and window size: {e}")
+                        return
+
                     try:
                         ack_response = client_socket.recv(BUFFER_SIZE).decode('utf-8').strip()
                         if ack_response == "ACK_HEADER_AND_SEGMENTS":
@@ -176,190 +168,80 @@ def start_client():
                             ack_received = True
                         else:
                             print(f"[Error] Unexpected response from server: {ack_response}")
-                            exit(1)
+                            return
                     except Exception as e:
                         print(f"[Error] Failed to receive ACK: {e}")
-                        exit(1)
-                elif response:
-                    print(f"[Error] Unexpected message from server: {response}")
-                    exit(1)
+                        return
 
             if not ack_received:
-                print("[Error] ACK_HEADER_AND_SEGMENTS not received. Reconnecting...")
-                try:
-                    client_socket.close()
-                except Exception as e:
-                    print(f"[Warning] Failed to close socket: {e}")
-
-                # התחברות מחדש
-                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                try:
-                    client_socket.connect((host, port))
-                    print("Reconnected to the server. Retrying header size and num of segment transmission...")
-                    client_socket.send(f"{header_size}".encode('utf-8'))
-                    print(f"Sent fixed header size after reconnecting: {header_size} and num of segment: {num_segments}")
-                except Exception as e:
-                    print(f"[Critical] Failed to reconnect or send header size and num of segment. Exiting. Error: {e}")
-                    exit(1)
+                print("[Error] ACK_HEADER_AND_SEGMENTS not received.")
+                return
 
         except Exception as e:
-            print(f"Failed to send header size and num of segment. Exiting. Error: {e}")
-            exit(1)  # סיום התוכנית במקרה של כשל
+            print(f"Failed to send header size and num of segment. Error: {e}")
+            return
 
-        # Split the message into parts
+        # Split the message into segments
         parts = [message[i:i + payload_size] for i in range(0, total_message_size, payload_size)]
         print(f"Total message size: {total_message_size}")
         print(f"Message split into {len(parts)} parts.")
-        print(f"num_segments: {num_segments}")
-
 
         window_start = 0
-        unacknowledged = set(range(len(parts)))  # Track unacknowledged parts
-        last_acknowledged = -1  # Start with -1 because no parts have been acknowledged yet
+        unacknowledged = set(range(len(parts)))
+        last_acknowledged = -1
 
-        # Precompute headers for all parts
-        print("******start sending the message*******")
-        headers = {
-            i: create_header(sequence_number=i, header_size=header_size)
-            for i in range(len(parts))
-        }
+        headers = {i: create_header(i, header_size) for i in range(len(parts))}
 
-        # Sliding window mechanism with timeout
+        # Sliding window mechanism for sending data
         try:
-            # הלקוח שולח את ההודעות לפי גודל החלון ואז מחכה ל-ACK עבור כל ה-BATCH.
             while unacknowledged:
                 window_end = min(window_start + window_size, len(parts))
                 print(f"Current window: {window_start} to {window_end - 1}")
 
-                # הכנת ה-BATCH של ההודעות לשליחה
+                # Prepare and send messages in the current window
                 batch_messages = []
                 for i in range(window_start, window_end):
                     if i in unacknowledged:
                         header = headers[i]
                         full_message = header + parts[i] + "\n"
                         batch_messages.append(full_message)
-                        print(
-                            f"[Debug] Prepared message Part {i}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
+                        print(f" Prepared message Part {i}: {full_message}")
 
                 if batch_messages:
-                    # שולחים את כל ה-BATCH (כל ההודעות שבחלון) באותו הזמן
-                    batch_data = "".join(batch_messages)  # לא צריך '\n' בסוף כי כבר מוסיפים אותו בהודעות
-                    try:
-                        client_socket.send(batch_data.encode('utf-8'))
-                        print(f"[Client] Sent batch successfully: {batch_data}")
-                    except Exception as e:
-                        print(f"[Error] Failed to send batch: {e}")
-                        raise
+                    batch_data = "".join(batch_messages)
+                    client_socket.send(batch_data.encode('utf-8'))
+                    print(f"[Client] Sent batch: {batch_data}")
 
-                # התחל טיימר לחכות ל-ACK
+                # Wait for ACK from the server
                 timer_start = time.time()
                 ack_received = False
-                final_ack_received = False  # Flag to check if FINAL_ACK is received
 
-                # המתנה ל-ACK עבור כל ההודעות שב-BATCH
                 while time.time() - timer_start < timeout:
                     try:
-                        client_socket.settimeout(timeout - (time.time() - timer_start))
                         response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                        print(f"this is the response: {response}")
-
-                        # # הגדרת timeout לשימוש בתוך הלולאה
-                        # if response == "FINAL_ACK":
-                        #     print("[Client] Received FINAL_ACK from server. Closing connection.")
-                        #     final_ack_received = True
-                        #     break  # Exit the loop when the server sends the final ACK
+                        print(f"Server response: {response}")
 
                         if response.startswith("ACK"):
                             ack_num = int(response.replace("ACK", "").strip())
-                            print(f"[ACK] Received ACK for message: {ack_num}")
-                            ack_received = True
-
-                            # בדוק אם זה ה-ACK עבור ההודעה האחרונה
-                            if ack_num == num_segments - 1:
-                                print("[Client] Last ACK received. Waiting for FINAL_ACK from server.")
-
-                                # המתן לקבלת FINAL_ACK
-                                while True:
-                                    #todo timeoot
-                                    response = client_socket.recv(BUFFER_SIZE).decode('utf-8')
-                                    if response == "FINAL_ACK":
-                                        print("[Client] Received FINAL_ACK from server. Closing connection.")
-                                        final_ack_received = True
-                                        break  # Exit the loop when the server sends the final ACK
-                                    else:
-                                        print(f"[Error] Unexpected response: {response}. Retrying...")
-
-
-                            # עיבוד ACK עבור כל המסרים
+                            print(f"[ACK] Received ACK for message: {ack_num}\n")
                             for seq in range(window_start, ack_num + 1):
-                                if seq in unacknowledged:
-                                    unacknowledged.discard(seq)
+                                unacknowledged.discard(seq)
                             window_start = ack_num + 1
-                            break  # Exit timeout loop on successful ACK
-
-                        else:
-                            print(f"[Error] Unexpected response from server: {response}")
+                            ack_received = True
+                            break
 
                     except socket.timeout:
-                        print(f"[Timeout] No ACK received within {timeout} seconds.")
+                        print(f"[Timeout] No ACK received.")
                         break
-                    except (ValueError, ConnectionResetError) as e:
-                        print(f"[Error] Acknowledgment processing failed: {e}. Retrying unacknowledged parts.")
-                        break
-
-
-                    else:
-                        print("[Error] Did not receive final ACK. Closing connection.")
-
-                    client_socket.close()
-                    print("Connection closed.")
-
-
-
-                else:
-                    print("[Error] Did not receive final ACK. Closing connection.")
-
-                if not ack_received:
-                    if window_start >= len(parts):
-                        print("[Client] Final batch sent. No more messages to retry.")
-                        break
-                    else:
-                        print(f"[Retrying] Retrying unacknowledged parts in window: {window_start} to {window_end - 1}")
-
-                        # שליחת ההודעות מחדש עבור החלקים שלא אושרו
-                        batch_messages = []
-                        for i in range(window_start, window_end):
-                            if i in unacknowledged:
-                                header = headers[i]  # Use precomputed header
-                                full_message = header + parts[i]
-                                batch_messages.append(full_message)
-                                print(
-                                    f"[Debug] Prepared message Part {i + 1}/{len(parts)}: {full_message} (Size: {len(full_message)} bytes)")
-
-                        if batch_messages:
-                            # Join messages into a batch with '\n'
-                            batch_data = "".join(batch_messages) + "\n"
-                            print(f"[Debug] Complete batch to send: {batch_data}")
-
-                            try:
-                                client_socket.send(batch_data.encode('utf-8'))
-                                print(f"[Client] Sent batch successfully: {batch_data}")
-                            except Exception as e:
-                                print(f"[Error] Failed to send batch: {e}")
-                                raise
 
         finally:
             if not unacknowledged:
                 print("All messages sent and acknowledged.")
             else:
                 print("Not all messages were acknowledged.")
-
-            print("Closing the connection.")
-            client_socket.shutdown(socket.SHUT_WR)  # Graceful shutdown
+            client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
-            print("Connection closed gracefully.")
-
-
+            print("Connection closed.")
 
 if __name__ == "__main__":
     start_client()

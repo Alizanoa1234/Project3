@@ -1,5 +1,4 @@
-max_msg_size:5
+max_msg_size:40
 window_size:4
 timeout:5
-//message:This is message
 message: This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is messageThis is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message This is message

@@ -53,7 +53,7 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "Rebasing main",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -120,7 +120,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-50da183f06c8-2887949eec09-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-233.13135.95" />
+        <option value="bundled-js-predefined-d6986cc7102b-e768b9ed790e-JavaScript-PY-243.21565.199" />
+        <option value="bundled-python-sdk-cab1f2013843-4ae2d6a61b08-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-243.21565.199" />
       </set>
     </attachedChunks>
   </component>
@@ -137,8 +138,7 @@
       <workItem from="1735729379634" duration="13039000" />
       <workItem from="1735803314201" duration="10149000" />
       <workItem from="1735818498739" duration="2757000" />
-      <workItem from="1735906605945" duration="10117000" />
-      <workItem from="1736018608223" duration="13052000" />
+      <workItem from="1736063932027" duration="11691000" />
     </task>
     <task id="LOCAL-00001" summary="hdhdh">
       <option name="closed" value="true" />
@@ -284,47 +284,23 @@
       <option name="project" value="LOCAL‎" />
       <updated>1735846767111</updated>
     </task>
-    <task id="LOCAL‎-00019" summary="hdhdh">
+    <task id="LOCAL-00019" summary="hdhdh">
       <option name="closed" value="true" />
-      <created>1735850773473</created>
+      <created>1735906729393</created>
       <option name="number" value="00019" />
-      <option name="presentableId" value="LOCAL‎-00019" />
-      <option name="project" value="LOCAL‎" />
-      <updated>1735850773473</updated>
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1735906729393</updated>
     </task>
-    <task id="LOCAL‎-00020" summary="hdhdh">
+    <task id="LOCAL-00020" summary="hdhdh">
       <option name="closed" value="true" />
-      <created>1735853548469</created>
+      <created>1736079377206</created>
       <option name="number" value="00020" />
-      <option name="presentableId" value="LOCAL‎-00020" />
-      <option name="project" value="LOCAL‎" />
-      <updated>1735853548469</updated>
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1736079377206</updated>
     </task>
-    <task id="LOCAL‎-00021" summary="hdhdh">
-      <option name="closed" value="true" />
-      <created>1735915679090</created>
-      <option name="number" value="00021" />
-      <option name="presentableId" value="LOCAL‎-00021" />
-      <option name="project" value="LOCAL‎" />
-      <updated>1735915679090</updated>
-    </task>
-    <task id="LOCAL‎-00022" summary="hdhdh">
-      <option name="closed" value="true" />
-      <created>1736027240435</created>
-      <option name="number" value="00022" />
-      <option name="presentableId" value="LOCAL‎-00022" />
-      <option name="project" value="LOCAL‎" />
-      <updated>1736027240435</updated>
-    </task>
-    <task id="LOCAL‎-00023" summary="hdhdh">
-      <option name="closed" value="true" />
-      <created>1736032382372</created>
-      <option name="number" value="00023" />
-      <option name="presentableId" value="LOCAL‎-00023" />
-      <option name="project" value="LOCAL‎" />
-      <updated>1736032382372</updated>
-    </task>
-    <option name="localTasksCounter" value="24" />
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -346,7 +322,7 @@
     <option name="LAST_COMMIT_MESSAGE" value="hdhdh" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Project3$Server.coverage" NAME="Server Coverage Results" MODIFIED="1736032339770" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/Project3$Client.coverage" NAME="Client Coverage Results" MODIFIED="1736032342136" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Project3$Client.coverage" NAME="Client Coverage Results" MODIFIED="1736079444111" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Project3$Server.coverage" NAME="Server Coverage Results" MODIFIED="1736079440022" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
