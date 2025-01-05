@@ -127,7 +127,7 @@ def start_server():
                     print(f"Sent max message size: {response}")
 
                 print("Requesting header size and num segments from client...")
-                header_size, num_segments,  window_size = receive_parameters_from_client(client_socket)
+                header_size, num_segments, window_size = receive_parameters_from_client(client_socket)
                 if header_size is None:
                     print("Failed to receive header size and num segments. Closing connection.")
                     client_socket.close()
@@ -140,7 +140,6 @@ def start_server():
                     try:
                         highest_sequence_in_batch = last_acknowledged  # Track the highest sequence in the current batch
                         part_count = 0  # Track how many parts have been processed in this batch
-                        window_size = 4  # TODO: the window size can be adjusted by user input
                         string_buffer = ""  # Temporary buffer to store message contents
                         unordered_buffer = {}  # Buffer to store out-of-order messages
 
